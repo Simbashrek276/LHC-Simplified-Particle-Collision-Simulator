@@ -1,17 +1,28 @@
-"""LHC collision simulation.
+"""LHC collision generator.
 
-This file runs the experiment. It decides which particles come out of each
-collision, then judges the result with a simple detector and logs the events
-that pass. All the actual physics, meaning the energies, momenta, conservation,
-and boosts, lives in kinematics.py.
+This file has one job: produce collisions and write them down. It decides which
+particles come out of each collision, asks the physics engine for their energies
+and momenta, and logs every event that conserves energy and momentum. The actual
+physics lives in utilities/kinematics.py.
+
+It applies NO detector cuts. The file it writes is the complete, unfiltered
+sample of what the collisions produced.
+
+    collision.py          generates events        -> collision_data/events.txt
+    analysis.py           applies cuts to them    -> reads analysis_card.txt
+
+Splitting it this way means you can try as many different cuts as you like
+without regenerating the dataset, which is the slow part. It also matches how a
+real experiment works: the detector records everything it can, and the cuts are
+a choice made later by whoever is doing the analysis.
 
 The event flow from top to bottom is choose_final_state, then make_event, then
-the detector cuts, then write to file.
+the conservation check, then write to file.
 
-This is the full 3D version: every particle now carries a py component in
-addition to px and pz, and instead of a single planar angle each particle has
-two angles -- a polar angle theta (measured from the z axis) and an azimuthal
-angle phi (measured around the z axis, in the x-y plane).
+This is the full 3D version: every particle carries a py component in addition
+to px and pz, and instead of a single planar angle each particle has two angles
+-- a polar angle theta (measured from the z axis) and an azimuthal angle phi
+(measured around the z axis, in the x-y plane).
 """
 
 import math
@@ -22,16 +33,33 @@ from pathlib import Path
 import utilities.kinematics as kinematics
 
 TOTAL_ENERGY = 13.6           # TeV, the LHC collision energy
-TARGET_LOGGED_EVENTS = 100000    # stop once this many events pass the detector
+TARGET_LOGGED_EVENTS = 100000    # stop once this many events have been written
 OUTPUT_FILE = Path(__file__).resolve().parent / "collision_data" / "events.txt"
 
-# Detector cuts. A particle is only seen if it is energetic enough and does not
-# disappear down the beam pipe. The angular cut is now on the polar angle theta
-# (angle from the beam axis, z), which is the physically meaningful one for a
-# beam-pipe cut in 3D -- phi is just the angle around the beam and a real
-# detector is normally uniform in phi.
-MIN_ENERGY = 0.00                             # TeV
-VISIBLE_THETA_DEG = (0, 180)                  # polar angle window the detector covers
+# A small copy holding just the first few events, written alongside the full
+# file. events.txt is far too large for GitHub to display in a browser, so this
+# is the one to click on if you just want to see what the data looks like.
+SMALL_FILE = OUTPUT_FILE.with_name("events_small.txt")
+SMALL_EVENTS = 100
+
+# Random seed. With a number here, every run produces exactly the same events,
+# so anyone can reproduce your dataset from this file alone. Any whole number
+# works; change it to get a different (but still reproducible) sample. Set it to
+# None to get a fresh, unrepeatable sample every time.
+#
+# One seed covers everything: kinematics.py draws from the same random number
+# generator as this file, so seeding here fixes every random choice in the
+# whole event, from the final state down to each decay angle.
+#
+# Note: the events.txt shipped in collision_data/ was generated before this
+# setting existed, so that particular file cannot be reproduced exactly. Any
+# dataset generated from now on can.
+SEED = 2026
+
+# There are deliberately NO detector cuts in this file. Every collision that
+# conserves energy and momentum gets written out. Filtering happens later, in
+# analysis.py, driven by the numbers in analysis_card.txt. Keeping the two apart
+# means you can try a dozen different cuts without regenerating the dataset.
 
 # Real particle rest masses in TeV. Kept for reference only. The simulation now
 # treats every outgoing particle as massless, so these are not used when
@@ -87,14 +115,15 @@ def make_event(names):
     event = []
     for name, p in zip(names, momenta):
         # theta is measured from the z axis (0 = straight down the beam line,
-        # 180 = straight back the other way). phi is measured around the z axis
-        # in the x-y plane, the same way the old 2D angle was measured from z.
+        # 180 = straight back the other way). phi is measured around the z axis,
+        # in the x-y plane, starting from the x axis.
         p_mag = math.sqrt(p.px ** 2 + p.py ** 2 + p.pz ** 2)
         if p_mag > 0:
             theta = math.acos(max(-1.0, min(1.0, p.pz / p_mag)))
         else:
             theta = 0.0
         phi = math.atan2(p.py, p.px) % (2 * math.pi)
+
         event.append(Particle(name, p.E, p.px, p.py, p.pz, theta, phi))
     return event
 
@@ -104,21 +133,7 @@ def collision():
     return make_event(choose_final_state())
 
 
-# Step 3. The detector.
-def is_seen(particle):
-    """True if the detector can measure this particle, meaning it passes the cuts."""
-    if particle.energy < MIN_ENERGY:
-        return False
-    theta_deg = math.degrees(particle.theta)
-    low, high = VISIBLE_THETA_DEG
-    return low <= theta_deg <= high
-
-
-def passes_cuts(event):
-    """The event is kept only if every particle in it is seen."""
-    return all(is_seen(p) for p in event)
-
-
+# Step 3. The one check this file does make.
 def is_conserved(event):
     """Sanity check that energy sums to 13.6 TeV and momentum sums to zero.
 
@@ -154,34 +169,54 @@ def write_event(f, event_id, event):
     f.write("\n")
 
 
-# Step 5. Run collisions until enough events pass.
-def run_simulation():
-    """Collide until TARGET_LOGGED_EVENTS good events are logged. Returns counts."""
+# Step 5. Run collisions until enough events are logged.
+def run_collisions():
+    """Collide until TARGET_LOGGED_EVENTS events are logged. Returns counts.
+
+    Every event that conserves energy and momentum is written out. Nothing is
+    filtered here, so the file is the full, unbiased sample. Apply cuts to it
+    afterwards with analysis.py.
+    """
+    if SEED is not None:
+        random.seed(SEED)
+
     logged = 0
     total = 0
     # Create collision_data/ if it is not there, so a fresh clone can run this
     # without having to make the folder by hand.
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT_FILE, "w") as f:
+    with open(OUTPUT_FILE, "w") as f, open(SMALL_FILE, "w") as small:
         while logged < TARGET_LOGGED_EVENTS:
             total += 1
             event = collision()
 
-            # Skip anything impossible, not conserving, or unseen by the detector.
-            if event is None or not is_conserved(event) or not passes_cuts(event):
+            # The only rejection: something physically impossible.
+            if event is None or not is_conserved(event):
                 continue
 
             logged += 1
             write_event(f, logged, event)
+            # The first SMALL_EVENTS events also go into the small file, so it
+            # is always an exact excerpt of the big one.
+            if logged <= SMALL_EVENTS:
+                write_event(small, logged, event)
     return total, logged
 
 
 def main():
-    total, logged = run_simulation()
-    print("Simulation finished.")
-    print(f"Total collisions: {total}")
-    print(f"Accepted events: {logged}")
+    total, logged = run_collisions()
+    print("Collision generation finished.")
+    print(f"Collisions attempted: {total}")
+    print(f"Events written: {logged}")
     print(f"Saved to: {OUTPUT_FILE}")
+    print(f"First {min(SMALL_EVENTS, logged)} events also saved to: {SMALL_FILE}")
+    if SEED is None:
+        print("Random seed: none (this sample cannot be reproduced exactly)")
+    else:
+        print(f"Random seed: {SEED} (re-running with the same seed gives identical events)")
+    print()
+    print("No detector cuts were applied. Run analysis.py to apply the cuts")
+    print("listed in analysis_card.txt.")
 
 
 if __name__ == "__main__":

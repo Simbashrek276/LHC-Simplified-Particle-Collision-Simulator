@@ -1,0 +1,95 @@
+# ===========================================================================
+#  ANALYSIS CARD
+# ===========================================================================
+#  Edit the numbers in this file to change the detector cuts, then run
+#
+#      python analysis.py
+#
+#  You never need to edit any Python file to change a cut. This card is the
+#  only input analysis.py takes.
+#
+#  Rules for this file:
+#    - one setting per line, written as   name = value
+#    - anything after a # is a comment and is ignored
+#    - blank lines are ignored
+#    - write  none  to switch a cut off entirely
+#    - order does not matter
+# ===========================================================================
+
+
+# ---------------------------------------------------------------------------
+#  ENERGY CUT
+# ---------------------------------------------------------------------------
+#  Drop any particle carrying less energy than this. Very soft particles are
+#  lost in detector noise in a real experiment.
+#  Units: TeV.  Range: 0 to 13.6.  Set to 0 (or none) to switch off.
+
+min_energy = 0.0
+
+
+# ---------------------------------------------------------------------------
+#  ANGLE CUT
+# ---------------------------------------------------------------------------
+#  Keep a particle only if its polar angle theta falls inside this window.
+#  theta is measured away from the beam line: 0 deg is straight down the beam,
+#  90 deg is straight out the side, 180 deg is straight back.
+#
+#  Angles near 0 and 180 point into the beam pipe, where a real detector has no
+#  coverage, so this is the beam-pipe cut.
+#  Units: degrees.  Full range is 0 to 180, which switches the cut off.
+
+theta_min_deg = 0.0
+theta_max_deg = 180.0
+
+
+# ---------------------------------------------------------------------------
+#  PSEUDORAPIDITY CUT
+# ---------------------------------------------------------------------------
+#  An alternative way of writing the angle cut, in the units particle
+#  physicists normally use:  eta = -ln(tan(theta/2)).
+#
+#  Keep a particle only if |eta| is below this value. The standard ATLAS/CMS
+#  inner-detector acceptance is 2.5, which is the same as 9.385 deg < theta <
+#  170.615 deg.
+#
+#  This overlaps with the theta cut above. Using both is fine; a particle has
+#  to satisfy every cut that is switched on.
+#  Set to  none  to switch off.
+
+pseudo_rapidity_max = 2.5
+
+
+# ---------------------------------------------------------------------------
+#  TRANSVERSE MOMENTUM CUT
+# ---------------------------------------------------------------------------
+#  Keep a particle only if its momentum across the beam is at least this large.
+#      pt = sqrt(px^2 + py^2) = |p| * sin(theta)
+#
+#  A detector measures pt rather than total energy, and a very energetic
+#  particle skimming along the beam is useless because its sin(theta) is tiny.
+#  A typical LHC value is 0.1 TeV (100 GeV).
+#  Units: TeV.  Set to 0 (or none) to switch off.
+
+transverse_momentum_min = 0.1
+
+
+# ---------------------------------------------------------------------------
+#  HOW TO TREAT AN EVENT WHOSE PARTICLES DISAGREE
+# ---------------------------------------------------------------------------
+#  yes  = keep the event only if EVERY particle in it passes every cut.
+#         This is the strict reading and the default.
+#  no   = keep the event if AT LEAST ONE particle passes.
+#         Useful if you only care that something was detected.
+
+require_all_particles = yes
+
+
+# ---------------------------------------------------------------------------
+#  OUTPUT
+# ---------------------------------------------------------------------------
+#  yes = also write the surviving events to
+#            collision_data/events_analysed.txt
+#        in the same format as events.txt, so the graphing scripts can read it.
+#  no  = just print the report and write nothing.
+
+write_filtered_file = yes

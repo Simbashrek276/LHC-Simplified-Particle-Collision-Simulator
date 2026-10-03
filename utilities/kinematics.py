@@ -1,7 +1,8 @@
-"""Relativistic kinematics toolkit. Based on section 2.5 of the report.
+"""Relativistic kinematics toolkit. Based on section 2.5 of the project report,
+docs/report.pdf.
 
 This is the physics engine. It knows nothing about photons or protons by name.
-It only works with numbers, the masses in TeV and the four vectors. simulation.py
+It only works with numbers, the masses in TeV and the four vectors. collision.py
 owns the particle names and calls in here to build the actual energies and momenta.
 
 The main idea is that any final state can be built by splitting things two at a
@@ -15,7 +16,7 @@ Read the file in this order.
     2. two_body_decay and boost, the two building blocks
     3. draw_composite_mass, picking a composite's mass
     4. two_to_two, two_to_three, two_to_four, putting the blocks together
-    5. generate_momenta, the one function simulation.py calls
+    5. generate_momenta, the one function collision.py calls
 
 This is the full 3D version: momentum now has three spatial components
 (px, py, pz) instead of two. Random directions are drawn isotropically over the
@@ -119,7 +120,7 @@ def boost(p4, parent_p4):
         (2) vector p4 (E, px, py, pz): the energy momentum of the child particle
         in the rest frame of the parent particle (will be boost's argument)
     Output: vector new_P4(E, px, py, pz): the four vector of the child particle
-    in the lab frame (the 3D generalization of equation 8 in the report)
+    in the lab frame (the 3D generalization of equation 8 in docs/report.pdf)
     """
     E_A = parent_p4.E
     if E_A <= 0:
@@ -196,7 +197,7 @@ def draw_composite_mass(low, high):
 
 
 # Section 4. The generators, one per number of particles that come out.
-# These are the 2 to 2, 2 to 3, and 2 to 4 cases from the report.
+# These are the 2 to 2, 2 to 3, and 2 to 4 cases from the report (docs/report.pdf).
 
 def two_to_two(total_energy):
     """The collision turns into just two particles. This is the 2 to 2 case.
@@ -254,7 +255,7 @@ def two_to_four(total_energy):
     return [p3, p4, p5, p6]
 
 
-# Section 5. The entry point that simulation.py calls.
+# Section 5. The entry point that collision.py calls.
 
 def generate_momenta(n_particles, total_energy):
     """Build one event and hand back a four vector for every particle.
