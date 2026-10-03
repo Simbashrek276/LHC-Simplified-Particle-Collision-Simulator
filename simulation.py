@@ -25,32 +25,39 @@ TOTAL_ENERGY = 13.6           # TeV, the LHC collision energy
 TARGET_LOGGED_EVENTS = 100000    # stop once this many events pass the detector
 OUTPUT_FILE = Path(__file__).resolve().parent / "collision_data" / "events.txt"
 
-# Detector cuts. A particle is only seen if it is energetic enough and does not
-# disappear down the beam pipe. The angular cut is now on the polar angle theta
-# (angle from the beam axis, z), which is the physically meaningful one for a
-# beam-pipe cut in 3D -- phi is just the angle around the beam and a real
-# detector is normally uniform in phi.
-MIN_ENERGY = 0.00                             # TeV
-VISIBLE_THETA_DEG = (0, 180)                  # polar angle window the detector covers
+# ---------------------------------------------------------------------------
+# DETECTOR CUTS -- change these two numbers to change what the detector sees.
+# ---------------------------------------------------------------------------
+# These are the only two cuts in the system. Both are the standard quantities a
+# real LHC experiment cuts on, rather than raw energy and a raw angle.
+#
+# ETA_MAX is an acceptance in pseudorapidity, eta = -ln(tan(theta/2)). It is the
+# polar angle written in the units the field actually uses, and |eta| < 2.5 is
+# the usual ATLAS/CMS inner-detector coverage. In plain degrees it means
+#
+#       9.385 deg  <  theta  <  170.615 deg
+#
+# so it is exactly a beam-pipe cut: anything closer to the beam than that is
+# lost down the hole the beam passes through.
+#
+# PT_MIN is a cut on transverse momentum, pt = sqrt(px^2 + py^2), the part of
+# the momentum that points across the beam rather than along it. A detector
+# measures pt, not total energy, and a particle skimming down the beam pipe is
+# useless however energetic it is. For a massless particle pt = E * sin(theta),
+# so this doubles as an energy cut that is weighted by angle.
+ETA_MAX = 2.5                                 # |eta| must be below this
+PT_MIN = 0.1                                  # TeV, transverse momentum floor
 
-# Real particle rest masses in TeV. Kept for reference only. The simulation now
-# treats every outgoing particle as massless, so these are not used when
-# generating events. They would matter again if we ever switch back to real masses.
-MASS = {
-    "photon": 0.0,
-    "proton": 0.000938,
-    "positron": 0.000000511,
-    "electron": 0.000000511,
-    "muon": 0.0001057,
-    "antimuon": 0.0001057,
-    "neutron": 0.000939,
-    "antineutron": 0.000939,
-}
 
 # One outgoing particle. It carries its name plus everything the detector
 # measures about it. theta is the polar angle from the z axis, phi is the
-# azimuthal angle around the z axis in the x-y plane.
-Particle = namedtuple("Particle", ["name", "energy", "px", "py", "pz", "theta", "phi"])
+# azimuthal angle around the z axis in the x-y plane. eta and pt are the two
+# quantities the cuts are applied to, worked out once in make_event so that
+# is_seen does not have to recompute them.
+Particle = namedtuple(
+    "Particle",
+    ["name", "energy", "px", "py", "pz", "theta", "phi", "eta", "pt"],
+)
 
 
 # Step 1. Choose what comes out of the collision.
@@ -87,15 +94,28 @@ def make_event(names):
     event = []
     for name, p in zip(names, momenta):
         # theta is measured from the z axis (0 = straight down the beam line,
-        # 180 = straight back the other way). phi is measured around the z axis
-        # in the x-y plane, the same way the old 2D angle was measured from z.
+        # 180 = straight back the other way). phi is measured around the z axis,
+        # in the x-y plane, starting from the x axis.
         p_mag = math.sqrt(p.px ** 2 + p.py ** 2 + p.pz ** 2)
         if p_mag > 0:
             theta = math.acos(max(-1.0, min(1.0, p.pz / p_mag)))
         else:
             theta = 0.0
         phi = math.atan2(p.py, p.px) % (2 * math.pi)
-        event.append(Particle(name, p.E, p.px, p.py, p.pz, theta, phi))
+
+        # Transverse momentum: the part of the momentum across the beam.
+        pt = math.sqrt(p.px ** 2 + p.py ** 2)
+
+        # Pseudorapidity. We use eta = 0.5*ln((|p|+pz)/(|p|-pz)) rather than
+        # -ln(tan(theta/2)) because the two are equal but this form does not
+        # blow up when theta is tiny. A particle exactly on the beam line has
+        # infinite eta, which correctly fails any finite cut.
+        if p_mag > 0 and abs(p.pz) < p_mag:
+            eta = 0.5 * math.log((p_mag + p.pz) / (p_mag - p.pz))
+        else:
+            eta = math.copysign(math.inf, p.pz) if p.pz else 0.0
+
+        event.append(Particle(name, p.E, p.px, p.py, p.pz, theta, phi, eta, pt))
     return event
 
 
@@ -106,12 +126,15 @@ def collision():
 
 # Step 3. The detector.
 def is_seen(particle):
-    """True if the detector can measure this particle, meaning it passes the cuts."""
-    if particle.energy < MIN_ENERGY:
+    """True if the detector can measure this particle, meaning it passes the cuts.
+
+    Two cuts, both set at the top of this file. The particle has to carry enough
+    momentum across the beam (PT_MIN), and it has to be far enough away from the
+    beam pipe to land inside the detector at all (ETA_MAX).
+    """
+    if particle.pt < PT_MIN:
         return False
-    theta_deg = math.degrees(particle.theta)
-    low, high = VISIBLE_THETA_DEG
-    return low <= theta_deg <= high
+    return abs(particle.eta) < ETA_MAX
 
 
 def passes_cuts(event):

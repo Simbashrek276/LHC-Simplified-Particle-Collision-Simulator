@@ -1,11 +1,11 @@
-"""Shared reader for events.txt. Used by the step-outline graphing scripts.
+"""Shared reader for events.txt. Used by analysis.py and the graphing scripts.
 
 The old graphing scripts each re-implemented their own line parser and each one
 hard coded a column number. That broke when the simulation went to 3D, because
 the row layout gained two columns. This module owns the layout in one place so a
 future format change is a one line fix.
 
-The 3D row layout written by simulation.write_event is
+The 3D row layout written by collision.write_event is
 
     token  0        1            2           3          4         5         6
            name     Energy(TeV)  Theta(deg)  Phi(deg)   p_x(TeV)  p_y(TeV)  p_z(TeV)
@@ -13,9 +13,15 @@ The 3D row layout written by simulation.write_event is
 theta is the polar angle from the beam (z) axis and runs 0 to 180 degrees.
 phi is the azimuthal angle around the beam, in the x-y plane, 0 to 360 degrees.
 
-Events are grouped by how many particles came out, because that is what picks
-the generator in kinematics.py. Channel 2 is the 2 to 2 case, channel 3 is the
-2 to 3 case, channel 4 is the 2 to 4 case.
+Events are grouped two ways.
+
+    channel   how many particles came out (2, 3 or 4). This is what picks the
+              generator in kinematics.py.
+    process   the exact final state, such as p p -> e+ e- p p. One channel can
+              hold several processes: the 2 to 4 channel holds four of them.
+
+The graphing scripts work per process, because a figure titled "2 to 4" would be
+mixing muons, electrons, neutrons and photons on the same curve.
 """
 
 from collections import Counter
@@ -33,6 +39,52 @@ DEFAULT_FILE = DATA_DIR / "events.txt"
 # Slot index 0 is "particle 3", because particles 1 and 2 are the incoming beam
 # protons and are not written to the file.
 FIRST_PARTICLE_NUMBER = 3
+
+# How each particle name is written. The first form is matplotlib mathtext, for
+# figure titles and legends. The second is plain ASCII, for folder names and for
+# printing to a terminal that may not cope with Greek letters.
+PARTICLE_SYMBOLS = {
+    "proton":      (r"p",        "p"),
+    "neutron":     (r"n",        "n"),
+    "antineutron": (r"\bar{n}",  "nbar"),
+    "photon":      (r"\gamma",   "gamma"),
+    "positron":    (r"e^{+}",    "eplus"),
+    "electron":    (r"e^{-}",    "eminus"),
+    "muon":        (r"\mu^{-}",  "muminus"),
+    "antimuon":    (r"\mu^{+}",  "muplus"),
+}
+
+
+def particle_symbol(name):
+    """Mathtext for one particle, without the surrounding $ signs."""
+    return PARTICLE_SYMBOLS.get(name, (name, name))[0]
+
+
+def particle_ascii(name):
+    """Plain ASCII name for one particle."""
+    return PARTICLE_SYMBOLS.get(name, (name, name))[1]
+
+
+def process_label(state):
+    """The process as a figure title, e.g.  $p\\,p \\rightarrow e^{+}\\,e^{-}\\,p\\,p$.
+
+    The two incoming beam protons are always written first, since every process
+    in this simulation starts from a proton-proton collision.
+    """
+    final = r"\,".join(particle_symbol(n) for n in state)
+    return rf"$p\,p \rightarrow {final}$"
+
+
+def process_ascii(state):
+    """The process in plain text, e.g.  p p -> e+ e- p p."""
+    short = {"eplus": "e+", "eminus": "e-", "muminus": "mu-", "muplus": "mu+"}
+    final = " ".join(short.get(particle_ascii(n), particle_ascii(n)) for n in state)
+    return f"p p -> {final}"
+
+
+def process_slug(state):
+    """A folder name for the process, e.g.  pp_to_eplus_eminus_p_p."""
+    return "pp_to_" + "_".join(particle_ascii(n) for n in state)
 
 
 class Channel:
@@ -58,8 +110,28 @@ class Channel:
     def n_events(self):
         return self.energy.shape[0]
 
+    @property
+    def pt(self):
+        """Transverse momentum, the part of the momentum across the beam (TeV).
+
+        pt = sqrt(px^2 + py^2) = |p| sin(theta).
+        """
+        return np.sqrt(self.px ** 2 + self.py ** 2)
+
+    @property
+    def eta(self):
+        """Pseudorapidity, eta = -ln(tan(theta/2)).
+
+        Computed as 0.5*ln((|p|+pz)/(|p|-pz)), which is the same number but does
+        not lose precision when theta is tiny. A particle exactly on the beam
+        line would have infinite eta; with 100,000 events that never happens.
+        """
+        p = np.sqrt(self.px ** 2 + self.py ** 2 + self.pz ** 2)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return 0.5 * np.log((p + self.pz) / (p - self.pz))
+
     def particle_number(self, slot):
-        """File slot index to the particle number used in the report (3, 4, 5, 6)."""
+        """File slot index to the particle number used in docs/report.pdf (3, 4, 5, 6)."""
         return slot + FIRST_PARTICLE_NUMBER
 
     def names_in_slot(self, slot):
@@ -75,10 +147,25 @@ class Channel:
         return [name for name, _ in counts.most_common()]
 
     def label(self, slot):
-        """A legend label like 'Particle 3 (photon)' or 'Particle 3 (mixed)'."""
+        """A legend label like 'Particle 3: $e^{+}$', or '(mixed)' if it varies."""
         names = self.names_in_slot(slot)
-        tag = names[0] if len(names) == 1 else "mixed"
-        return f"Particle {self.particle_number(slot)} ({tag})"
+        if len(names) == 1:
+            return f"Particle {self.particle_number(slot)}: ${particle_symbol(names[0])}$"
+        return f"Particle {self.particle_number(slot)} (mixed)"
+
+    def pair_label(self, a, b):
+        """A legend label for a pair, like 'Pair 34: $e^{+}e^{-}$'."""
+        tag = f"Pair {self.particle_number(a)}{self.particle_number(b)}"
+        names_a, names_b = self.names_in_slot(a), self.names_in_slot(b)
+        if len(names_a) == 1 and len(names_b) == 1:
+            return f"{tag}: ${particle_symbol(names_a[0])}\\,{particle_symbol(names_b[0])}$"
+        return tag
+
+    @property
+    def state(self):
+        """The single final state of this Channel, if it holds only one."""
+        distinct = set(self.states)
+        return next(iter(distinct)) if len(distinct) == 1 else None
 
     def four_vector(self, slot):
         """(E, px, py, pz) arrays for one particle slot, one entry per event."""
@@ -116,15 +203,18 @@ class Channel:
         "proton"). Useful for pulling the diphoton events out of channel 4.
         """
         state = tuple(state)
-        keep = [i for i, s in enumerate(self.states) if s == state]
-        if not keep:
+        keep = np.array([s == state for s in self.states])
+        if not keep.any():
             raise ValueError(f"no events in channel {self.n_particles} with state {state}")
 
-        block = np.stack(
-            [self.energy, self.theta, self.phi, self.px, self.py, self.pz], axis=2
-        )[keep]
-        rows = block.reshape(-1, 6).tolist()
-        return Channel(self.n_particles, rows, [self.states[i] for i in keep])
+        # Slice the arrays directly rather than rebuilding from a list of rows,
+        # which is about ten times faster on the 2 to 4 channel.
+        sub = Channel.__new__(Channel)
+        sub.n_particles = self.n_particles
+        sub.states = [s for s, k in zip(self.states, keep) if k]
+        for name in ("energy", "theta", "phi", "px", "py", "pz"):
+            setattr(sub, name, getattr(self, name)[keep])
+        return sub
 
 
 def load_events(filename=DEFAULT_FILE):
@@ -182,12 +272,27 @@ def load_events(filename=DEFAULT_FILE):
     return {n: Channel(n, rows[n], states[n]) for n in sorted(rows)}
 
 
-# The name the report uses for each channel, for titles.
+# The name docs/report.pdf uses for each channel, for titles.
 CHANNEL_NAMES = {2: "2 to 2", 3: "2 to 3", 4: "2 to 4"}
 
 
 def channel_name(n_particles):
     return CHANNEL_NAMES.get(n_particles, f"2 to {n_particles}")
+
+
+def iter_processes(channels):
+    """Yield (state, Channel) once per distinct final state, in a fixed order.
+
+    Ordered by particle count, then by how often the process occurs, so the
+    output always comes out in the same sequence:
+
+        p p -> p p,  p p -> gamma p p,  then the four 2 to 4 processes.
+    """
+    for n in sorted(channels):
+        ch = channels[n]
+        counts = Counter(ch.states)
+        for state in sorted(counts, key=lambda s: (-counts[s], s)):
+            yield state, ch.filter_state(state)
 
 
 if __name__ == "__main__":
@@ -200,3 +305,9 @@ if __name__ == "__main__":
             mean_E = ch.energy[:, slot].mean()
             print(f"    slot {slot} (particle {ch.particle_number(slot)}): "
                   f"mean E = {mean_E:7.4f} TeV   names = {names}")
+
+    print()
+    print("By process:")
+    for state, sub in iter_processes(channels):
+        print(f"    {process_ascii(state):<28}{sub.n_events:>7} events"
+              f"   ->  plots/{process_slug(state)}/")

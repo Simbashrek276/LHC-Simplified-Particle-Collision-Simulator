@@ -6,6 +6,10 @@ __pycache__/
 .venv/
 venv/
 
+# Derived dataset written by analysis.py. Regenerate it with `python analysis.py`
+# rather than committing another 44 MB of events.
+collision_data/events_analysed.txt
+
 # OS and editor cruft
 .DS_Store
 Thumbs.db

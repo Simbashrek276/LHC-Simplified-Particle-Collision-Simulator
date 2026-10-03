@@ -1,0 +1,9 @@
+# Packages needed by analysis.py and the graphing scripts in analysis_tools/.
+# collision.py and utilities/kinematics.py use only the Python standard library.
+#
+# Install with:   pip install -r requirements.txt
+#
+# Developed and tested with numpy 2.4.1 and matplotlib 3.10.8 on Python 3.14.
+# Only basic features of each are used, so older releases should also work.
+numpy>=1.24
+matplotlib>=3.7

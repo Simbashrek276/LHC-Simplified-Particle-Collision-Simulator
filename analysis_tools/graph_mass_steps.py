@@ -2,11 +2,11 @@
 
 A word on what "the mass of each particle" means here, because it is not what
 you might expect. kinematics.py treats every outgoing particle as massless. So
-the mass of a single particle is zero by construction, in all three channels,
-always. Plotting it tells you nothing about the physics -- but it is still worth
-one figure, because it tells you something about the data file: whatever width
-that spike has is pure numerical noise, and it sets the floor on how sharp any
-other mass peak in this file can possibly be.
+the mass of a single particle is zero by construction, in every process, always.
+Plotting it tells you nothing about the physics -- but it is still worth one
+figure, because it tells you something about the data file: whatever width that
+spike has is pure numerical noise, and it sets the floor on how sharp any other
+mass peak in this file can possibly be.
 
 The masses that actually carry information are the ones belonging to groups of
 particles. Two massless photons flying apart have a real, heavy combined mass.
@@ -14,7 +14,7 @@ That is what the composites in kinematics.py are, and it is what a real detector
 reconstructs when it looks for a Higgs. So the rest of this script plots the
 invariant mass of every pair.
 
-Which pairs matter depends on the channel.
+Which pairs matter depends on how many particles the process has.
 
     2 to 2   only one pair exists and it is the whole collision, so its mass is
              pinned at 13.6 TeV. Included for completeness.
@@ -23,19 +23,24 @@ Which pairs matter depends on the channel.
              real object, and they are the "background" shape for comparison.
     2 to 4   particles 3 and 4 came out of one composite and 5 and 6 out of the
              other, so m(34) and m(56) are the drawn masses. The four crossed
-             pairs get their own figure.
+             pairs get their own figure, since six curves is more than can be
+             told apart on one set of axes.
 
-This also replaces "invariant_mass_graph_1&2.py", which is written against the
-old 2D file layout: it reads column 4 as p_z when in the 3D file column 4 is
-p_y, and it never picks up p_z at all. Pointed at the current events.txt it
-returns wrong masses rather than failing.
+In the p p -> gamma gamma p p process, pair 34 is the two photons, so its
+composite-pairs figure is the diphoton mass -- the plot where a Higgs boson
+would appear as a bump at 0.125 TeV.
 
-Run:  python graph_mass_steps.py
+Output, per process folder plots/<process>/:
+    mass_single.png
+    mass_pairs.png                     (2 to 2 and 2 to 3)
+    mass_pairs_composites.png          (2 to 4)
+    mass_pairs_crossed.png             (2 to 4)
+
+Run:  python analysis_tools/graph_mass_steps.py
 """
 
-import os
-from pathlib import Path
 from itertools import combinations
+from pathlib import Path
 
 import event_data
 import step_plot
@@ -57,17 +62,15 @@ BINS = 50
 NOISE_RANGE = (0.0, 0.005)
 
 
-def pair_label(ch, a, b):
-    return f"Pair {ch.particle_number(a)}{ch.particle_number(b)}"
-
-
 def main():
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
     channels = event_data.load_events(DATA_FILE)
 
-    for n, ch in channels.items():
-        name = event_data.channel_name(n)
-        print(f"{name} case: {ch.n_events} events")
+    for state, ch in event_data.iter_processes(channels):
+        process = event_data.process_label(state)
+        out = OUTPUT_DIR / event_data.process_slug(state)
+        out.mkdir(parents=True, exist_ok=True)
+        n = ch.n_particles
+        print(f"{event_data.process_ascii(state)}: {ch.n_events} events")
 
         # 1. Single particle masses. Expected to be zero everywhere.
         print("  single particle mass (expected zero, so this measures file precision):")
@@ -76,64 +79,38 @@ def main():
             bins=BINS,
             value_range=NOISE_RANGE,
             xlabel="Reconstructed single particle mass (TeV)",
-            title=f"Single particle mass, {name} case",
+            title=f"Single particle mass,   {process}",
             subtitle="every outgoing particle is massless by construction, "
                      "so this width is rounding in events.txt",
-            filename=os.path.join(OUTPUT_DIR, f"mass_single_steps_{n}particles.png"),
+            filename=out / "mass_single.png",
             ratio_panel=False,
         )
 
-        # 2. Pair masses. Split into two figures for the 2 to 4 case, because
-        #    six pairs is more curves than can be told apart on one axes.
-        pairs = list(combinations(range(n), 2))
-
+        # 2. Pair masses. Split into two figures for 2 to 4 processes.
         if n == 4:
-            # The two pairs that were really composites, then the four that
-            # were not. Keeping them apart is the whole point of the figure.
             groups = [
-                ("composite pairs", [(0, 1), (2, 3)], "mass_pairs_composites",
+                ("composite pairs", [(0, 1), (2, 3)], "mass_pairs_composites.png",
                  "pairs 34 and 56 each came out of one composite, so these are "
                  "the masses the generator drew"),
-                ("crossed pairs", [(0, 2), (0, 3), (1, 2), (1, 3)], "mass_pairs_crossed",
+                ("crossed pairs", [(0, 2), (0, 3), (1, 2), (1, 3)], "mass_pairs_crossed.png",
                  "these pairs were never a single object, so this is the "
                  "combinatorial background shape"),
             ]
         else:
-            groups = [("every pair", pairs, "mass_pairs", f"{ch.n_events} events")]
+            groups = [("every pair", list(combinations(range(n), 2)), "mass_pairs.png",
+                       f"{ch.n_events} events")]
 
-        for group_name, group_pairs, stem, note in groups:
+        for group_name, pairs, filename, note in groups:
             print(f"  {group_name}:")
             step_plot.outline_figure(
-                [(pair_label(ch, a, b), ch.invariant_mass(a, b)) for a, b in group_pairs],
+                [(ch.pair_label(a, b), ch.invariant_mass(a, b)) for a, b in pairs],
                 bins=BINS,
                 value_range=(0.0, TOTAL_ENERGY),
                 xlabel="Invariant mass of the pair (TeV)",
-                title=f"Pair invariant mass, {group_name}, {name} case",
+                title=f"Pair invariant mass, {group_name},   {process}",
                 subtitle=note,
-                filename=os.path.join(OUTPUT_DIR, f"{stem}_steps_{n}particles.png"),
+                filename=out / filename,
             )
-
-    # 3. The diphoton mass, on its own, from the events that really have two
-    #    photons. This is the search channel the old script was aiming at.
-    if 4 in channels:
-        diphoton_state = ("photon", "photon", "proton", "proton")
-        try:
-            sub = channels[4].filter_state(diphoton_state)
-        except ValueError as exc:
-            print(f"diphoton: skipped, {exc}")
-            return
-
-        print(f"diphoton events: {sub.n_events}")
-        step_plot.outline_figure(
-            [("Pair 34 (the two photons)", sub.invariant_mass(0, 1)),
-             ("Pair 56 (the two protons)", sub.invariant_mass(2, 3))],
-            bins=BINS,
-            value_range=(0.0, TOTAL_ENERGY),
-            xlabel="Invariant mass (TeV)",
-            title="Diphoton invariant mass",
-            subtitle=f"{sub.n_events} photon photon proton proton events",
-            filename=os.path.join(OUTPUT_DIR, "mass_diphoton_steps.png"),
-        )
 
 
 if __name__ == "__main__":
