@@ -5,7 +5,7 @@ hard coded a column number. That broke when the simulation went to 3D, because
 the row layout gained two columns. This module owns the layout in one place so a
 future format change is a one line fix.
 
-The 3D row layout written by collision.write_event is
+The 3D row layout written by simulation.write_event is
 
     token  0        1            2           3          4         5         6
            name     Energy(TeV)  Theta(deg)  Phi(deg)   p_x(TeV)  p_y(TeV)  p_z(TeV)

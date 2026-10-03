@@ -2,7 +2,7 @@
 docs/report.pdf.
 
 This is the physics engine. It knows nothing about photons or protons by name.
-It only works with numbers, the masses in TeV and the four vectors. collision.py
+It only works with numbers, the masses in TeV and the four vectors. simulation.py
 owns the particle names and calls in here to build the actual energies and momenta.
 
 The main idea is that any final state can be built by splitting things two at a
@@ -16,7 +16,7 @@ Read the file in this order.
     2. two_body_decay and boost, the two building blocks
     3. draw_composite_mass, picking a composite's mass
     4. two_to_two, two_to_three, two_to_four, putting the blocks together
-    5. generate_momenta, the one function collision.py calls
+    5. generate_momenta, the one function simulation.py calls
 
 This is the full 3D version: momentum now has three spatial components
 (px, py, pz) instead of two. Random directions are drawn isotropically over the
@@ -255,7 +255,7 @@ def two_to_four(total_energy):
     return [p3, p4, p5, p6]
 
 
-# Section 5. The entry point that collision.py calls.
+# Section 5. The entry point that simulation.py calls.
 
 def generate_momenta(n_particles, total_energy):
     """Build one event and hand back a four vector for every particle.

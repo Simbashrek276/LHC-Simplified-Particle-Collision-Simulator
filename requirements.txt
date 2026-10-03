@@ -1,5 +1,5 @@
 # Packages needed by analysis.py and the graphing scripts in analysis_tools/.
-# collision.py and utilities/kinematics.py use only the Python standard library.
+# simulation.py and utilities/kinematics.py use only the Python standard library.
 #
 # Install with:   pip install -r requirements.txt
 #

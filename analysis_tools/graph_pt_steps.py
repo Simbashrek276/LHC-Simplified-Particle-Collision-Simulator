@@ -37,7 +37,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_FILE = PROJECT_ROOT / "collision_data" / "events.txt"
 OUTPUT_DIR = PROJECT_ROOT / "plots"
 
-TOTAL_ENERGY = 13.6   # TeV, matches collision.TOTAL_ENERGY
+TOTAL_ENERGY = 13.6   # TeV, matches simulation.TOTAL_ENERGY
 BINS = 50
 PT_REFERENCE = 0.1    # TeV, a typical cut; marked as a reference line only
 

@@ -1,10 +1,10 @@
 """Apply detector cuts to a generated dataset.
 
-collision.py writes down every collision it produces, unfiltered. This file is
+simulation.py writes down every collision it produces, unfiltered. This file is
 the second half of the job: it reads that dataset, throws away whatever the
 detector would not have seen, and tells you what survived.
 
-    collision.py    generates events    -> collision_data/events.txt
+    simulation.py    generates events    -> collision_data/events.txt
     analysis.py     applies cuts        <- analysis_card.txt
 
 Every cut value comes from analysis_card.txt, so changing what the detector sees
@@ -249,7 +249,7 @@ def report(settings, results, card_path):
 
 
 def write_filtered(results):
-    """Write the surviving events out in the same format collision.py uses.
+    """Write the surviving events out in the same format simulation.py uses.
 
     Keeping the format identical means the graphing scripts can read this file
     without any changes -- point their DATA_FILE at it and everything works.

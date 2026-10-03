@@ -32,13 +32,13 @@ two protons (5 and 6), which is a real asymmetry in how we generate events — s
 1. [The physics, from scratch](#1-the-physics-from-scratch)
 2. [How the code mirrors the physics](#2-how-the-code-mirrors-the-physics)
 3. [How to run it](#3-how-to-run-it) — including
-   [where to change the settings](#34-where-to-change-the-settings) and
-   [running the tests](#35-running-the-tests)
+   [where to change the settings](#34-where-to-change-the-settings)
 4. [The output file explained](#4-the-output-file-explained)
 5. [Making the plots](#5-making-the-plots)
 6. [What the plots should look like](#6-what-the-plots-should-look-like)
 7. [Known limitations and things still to fix](#7-known-limitations-and-things-still-to-fix)
 8. [Project structure](#8-project-structure)
+9. [License](#9-license)
 
 ---
 
@@ -104,7 +104,7 @@ before and after the collision:
    fragments of an explosion.
 
 Every event this simulation produces obeys both rules exactly. That is the single
-most important correctness property of the whole program, and `collision.py`
+most important correctness property of the whole program, and `simulation.py`
 re-checks it on every event rather than taking it on trust.
 
 ### 1.4 Describing one particle: the four-vector
@@ -285,7 +285,7 @@ momentum automatically.
 
 A real detector cannot see everything, so we model its blind spots with **cuts**.
 
-**The cuts are not part of the generator.** `collision.py` writes down every
+**The cuts are not part of the generator.** `simulation.py` writes down every
 collision it makes, unfiltered. The cuts are applied afterwards by `analysis.py`,
 which reads its numbers from a plain text file, `analysis_card.txt`. You change
 what the detector sees by editing that card — never by editing code.
@@ -390,7 +390,7 @@ removes a cone at small θ, not a wedge in φ, and a real detector is built
 symmetrically around the beam.
 
 > **The dataset in `collision_data/events.txt` is uncut**, which is exactly as
-> intended — `collision.py` never filters. Run `analysis.py` to apply the card's
+> intended — `simulation.py` never filters. Run `analysis.py` to apply the card's
 > cuts to it. See [section 3.4](#34-where-to-change-the-settings).
 
 ---
@@ -404,7 +404,7 @@ any stage on its own.
 ```
    STAGE 1 — generate                STAGE 2 — cut               STAGE 3 — plot
 
-   collision.py                      analysis.py                 graph_*_steps.py
+   simulation.py                      analysis.py                 graph_*_steps.py
         │                                 │                            │
         │ uses utilities/kinematics.py    │ reads analysis_card.txt     │ use event_data.py
         ▼                                 ▼                            ▼
@@ -420,9 +420,9 @@ can go straight from stage 1 to stage 3 if you want the unfiltered picture.
 | File | Plays the role of | Responsible for |
 |------|-------------------|-----------------|
 | `utilities/kinematics.py` | the **physicist** | the physics: four-vectors, two-body splits, boosts, invariant mass (sections 1.4–1.8). Deals only in numbers, never particle names. |
-| `collision.py` | the **director** | running the experiment: choosing final states and writing the output (sections 1.2, 1.3). |
+| `simulation.py` | the **director** | running the experiment: choosing final states and writing the output (sections 1.2, 1.3). |
 
-`collision.py` applies **no cuts at all**. The only event it ever throws away is
+`simulation.py` applies **no cuts at all**. The only event it ever throws away is
 one that fails the energy and momentum conservation check, which would mean a bug
 rather than a detector limitation.
 
@@ -447,7 +447,7 @@ rather than a detector limitation.
 `kinematics.py` never mentions "photon" or "proton". It only sees masses and
 numbers, which keeps the physics reusable and testable on its own.
 
-**`collision.py`** reads top to bottom as five steps:
+**`simulation.py`** reads top to bottom as five steps:
 
 1. **`choose_final_state()`** rolls a random number and returns the list of
    particle **names** for this collision, from the menu in section 1.2.
@@ -458,7 +458,7 @@ numbers, which keeps the physics reusable and testable on its own.
 3. **`is_conserved(event)`** re-checks that energy sums to 13.6 and momentum sums
    to zero. This is the only rejection the file makes.
 4. **`write_event(...)`** appends one event to the output file.
-5. **`run_collisions()` / `main()`** loop until enough events are logged, then
+5. **`run_simulation()` / `main()`** loop until enough events are logged, then
    print a short summary.
 
 ### 2.2 Stage 2, applying the cuts
@@ -525,8 +525,8 @@ all — it only acts when one of the three `graph_*` scripts imports it.
 ### 2.4 The data flow, end to end
 
 ```
- collision.py                           utilities/kinematics.py
- ────────────                           ───────────────────────
+ simulation.py                          utilities/kinematics.py
+ ─────────────                           ───────────────────────
  choose_final_state()
    → ["photon","photon","proton","proton"]   (just names, no physics yet)
         │
@@ -546,7 +546,7 @@ all — it only acts when one of the three `graph_*` scripts imports it.
    repeat until 100,000 events are logged
 ```
 
-**In one sentence:** `collision.py` decides *which* particles appear, while
+**In one sentence:** `simulation.py` decides *which* particles appear, while
 `kinematics.py` produces the *actual energies and momenta*, obeying the
 conservation laws by construction. Neither of them judges whether the detector
 would have seen the result -- that is `analysis.py`.
@@ -653,7 +653,7 @@ Only needed if you want a different number of events, or if you have changed the
 physics:
 
 ```powershell
-python collision.py             # ~5s
+python simulation.py             # ~5s
 ```
 
 > **Careful.** This opens `collision_data/events.txt` in write mode and
@@ -674,7 +674,7 @@ the code:
 | What you want to change | Where |
 |---|---|
 | **The detector cuts** | `analysis_card.txt` — a plain text file, no Python |
-| **How many collisions to generate** | `collision.py`, line 36 |
+| **How many collisions to generate** | `simulation.py`, line 36 |
 
 You never need to touch anything in `utilities/` or `analysis_tools/`.
 
@@ -719,18 +719,18 @@ it.
 
 ---
 
-#### Changing the number of collisions — edit `collision.py`
+#### Changing the number of collisions — edit `simulation.py`
 
 This is the one people look for most often. **Change the number on this line:**
 
 ```python
-# collision.py, line 36
+# simulation.py, line 36
 TARGET_LOGGED_EVENTS = 100000    # stop once this many events have been written
 #                      ^^^^^^
 #                      CHANGE THIS
 ```
 
-Since `collision.py` applies no cuts, this is simply how many events end up in
+Since `simulation.py` applies no cuts, this is simply how many events end up in
 the file. Rough guide:
 
 | Value | Runtime | Output size | Good for |
@@ -743,7 +743,7 @@ the file. Rough guide:
 #### Collision energy and output location
 
 ```python
-# collision.py, lines 35 and 37
+# simulation.py, lines 35 and 37
 TOTAL_ENERGY = 13.6              # TeV, the LHC collision energy
 OUTPUT_FILE  = Path(__file__).resolve().parent / "collision_data" / "events.txt"
 ```
@@ -757,11 +757,11 @@ side by side rather than overwriting.
 #### Random seed
 
 ```python
-# collision.py, a few lines below the settings above
+# simulation.py, a few lines below the settings above
 SEED = 2026
 ```
 
-With a number here, every run of `collision.py` produces **exactly the same
+With a number here, every run of `simulation.py` produces **exactly the same
 events**, so anyone with the code can regenerate your dataset byte for byte. One
 seed covers the whole chain, because `kinematics.py` draws from the same random
 number generator. Change the number to get a different but still reproducible
@@ -772,48 +772,20 @@ existed, so it is the one exception — see
 [section 7](#7-known-limitations-and-things-still-to-fix).
 
 > **After editing the card**, just re-run `python analysis.py` — the collisions
-> do not need regenerating. **After editing `collision.py`**, re-run
-> `python collision.py` first, then `analysis.py`, then the graph scripts.
-
----
-
-### 3.5 Running the tests
-
-The `tests/` folder checks that the simulation still obeys the physics after you
-change something. From the project root:
-
-```powershell
-python -m unittest             # one dot per test
-python -m unittest -v          # one line per test, with its name
-```
-
-All 51 tests run in about 3 seconds, and a clean run ends with `OK`. They need
-nothing beyond `requirements.txt`, since they use Python's built-in `unittest`.
-
-| File | What it checks |
-|---|---|
-| `test_kinematics.py` | Energy and momentum are conserved in every channel; outgoing particles are massless; the two-body decay formula; a Lorentz boost preserves mass and undoes cleanly; composite masses survive decay and boost; directions are genuinely isotropic (flat in cos θ and φ). |
-| `test_collision.py` | θ and φ rebuild the momentum; final states occur at their advertised rates; the generator applies no cuts; the same seed gives identical files and different seeds give different ones; `events_small.txt` is an exact excerpt of `events.txt`. |
-| `test_event_data.py` | The reader gets all 100 events from `events_small.txt`; they still conserve energy and momentum after rounding; pT and η agree with their formulas; a half-written final event is ignored; processes add up to every event. |
-| `test_analysis.py` | The card is read correctly; every kind of mistake in it (a typo, a non-number, an upside-down θ window and so on) stops the program instead of being ignored; each cut works on its own; every event that survives really does pass the cuts. |
-
-**The tests never touch your real files.** Anything that runs the generator writes
-to a temporary folder, and anything that reads a card writes its own temporary
-one, so `collision_data/` and `analysis_card.txt` are left exactly as they were.
-
-It is a good habit to run them after any change to `utilities/kinematics.py` or
-`collision.py`. If one fails, its name says what broke.
+> do not need regenerating. **After editing `simulation.py`**, re-run
+> `python simulation.py` first, then `analysis.py`, then the graph scripts.
 
 ---
 
 ## 4. The output file explained
 
-> **Just want to look at the data?** Open
-> [`collision_data/events_small.txt`](collision_data/events_small.txt). The full
-> `events.txt` is 48 MB, far too large for GitHub to display in a browser, so
-> `collision.py` also writes the first 100 events to this small file every time
-> it runs. It is an exact excerpt of the big one, in the same format, and the
-> analysis scripts read it just as happily.
+The project produces exactly **two event files**, both in `collision_data/` and
+both in the format described below:
+
+| File | Written by | Contents |
+|---|---|---|
+| `events.txt` | `simulation.py` | Every generated collision, with no cuts applied |
+| `events_analysed.txt` | `analysis.py` | Only the events that pass the cuts in `analysis_card.txt` |
 
 `collision_data/events.txt` holds one block per accepted event:
 
@@ -989,7 +961,7 @@ thinly populated tails of every distribution look broken.
 These are honest caveats rather than bugs that break the run.
 
 1. **Every particle is treated as massless.** A deliberate simplification: final
-   particles get no rest mass, so the `MASS` table in `collision.py` is kept for
+   particles get no rest mass, so the `MASS` table in `simulation.py` is kept for
    reference only. It is a good approximation because all these masses are tiny
    next to 13.6 TeV, but it does mean a reconstructed proton comes out at ~0
    rather than its real 0.938 GeV. The intermediate composites still carry mass,
@@ -1017,7 +989,7 @@ These are honest caveats rather than bugs that break the run.
    output format caps reconstructed invariant mass precision at a few GeV. That
    is fine for TeV-scale composites but would matter for a 125 GeV peak.
 
-6. **The figures are drawn from the uncut dataset.** `collision.py` applies no
+6. **The figures are drawn from the uncut dataset.** `simulation.py` applies no
    cuts by design, so `collision_data/events.txt` and everything in `plots/` is
    the full sample. Running `analysis.py` with the card's default cuts would drop
    roughly 7% of events. Everything is consistent as it stands — just be aware
@@ -1027,11 +999,11 @@ These are honest caveats rather than bugs that break the run.
 7. **`collision_data/events.txt` is 48 MB and tracked in git.** Convenient, since the plots can
    be reproduced without re-running anything, but it makes the repository heavy.
 
-8. **The shipped dataset predates the random seed.** `collision.py` now has a
+8. **The shipped dataset predates the random seed.** `simulation.py` now has a
    `SEED` setting, so any dataset generated from here on can be reproduced
    exactly. The `events.txt` in `collision_data/` was generated before that
    setting existed, so that particular file cannot be. Re-running
-   `python collision.py` would replace it with a reproducible one, at the cost
+   `python simulation.py` would replace it with a reproducible one, at the cost
    of every event count and figure in this README changing slightly.
 
 9. **No error bars.** The histograms and ratio panels show counts only, without
@@ -1049,7 +1021,7 @@ stages through `collision_data/`.
 
 ```
 LHC Simulation/
-├── collision.py                STAGE 1 — generate events, no cuts applied
+├── simulation.py               STAGE 1 — generate events, no cuts applied
 ├── analysis.py                 STAGE 2 — apply the cuts
 ├── analysis_card.txt           >>> THE FILE YOU EDIT to change the cuts <<<
 │
@@ -1066,7 +1038,6 @@ LHC Simulation/
 │
 ├── collision_data/
 │   ├── events.txt              100,000 events, the full uncut dataset
-│   ├── events_small.txt        the first 100 of them, small enough to view on GitHub
 │   └── events_analysed.txt     only the events that survived the cuts
 │                               (written by analysis.py; not tracked in git)
 │
@@ -1078,16 +1049,11 @@ LHC Simulation/
 │   ├── pp_to_eplus_eminus_p_p/
 │   └── pp_to_gamma_gamma_p_p/
 │
-├── tests/                      51 checks that the physics still holds — run with
-│   ├── test_kinematics.py      `python -m unittest`
-│   ├── test_collision.py
-│   ├── test_event_data.py
-│   └── test_analysis.py
-│
 ├── docs/
 │   └── report.pdf              the written report with the full derivations
 │
-└── requirements.txt            the Python packages to install
+├── requirements.txt            the Python packages to install
+└── COPYING                     the license (GNU GPL v3)
 ```
 
 Every script works out these paths from its own location rather than from the
@@ -1098,7 +1064,7 @@ working directory, so they behave the same wherever you launch them from.
 | File | What it is |
 |------|------------|
 | `utilities/kinematics.py` | The physics engine: four-vectors, two-body decays, Lorentz boosts, invariant mass. Knows nothing about particle names. |
-| `collision.py` | Stage 1. Chooses final states, generates their kinematics, writes `collision_data/events.txt`. Applies no cuts. |
+| `simulation.py` | Stage 1. Chooses final states, generates their kinematics, writes `collision_data/events.txt`. Applies no cuts. |
 | `analysis.py` | Stage 2. Reads `analysis_card.txt`, applies the cuts, reports what survived, writes `collision_data/events_analysed.txt`. |
 | `analysis_card.txt` | The cut values, in plain text. **The only file you edit to change what the detector sees.** |
 | `analysis_tools/event_data.py` | Parses `events.txt` and groups events by channel. Run it on its own for a quick summary of the dataset. |
@@ -1108,11 +1074,21 @@ working directory, so they behave the same wherever you launch them from.
 | `analysis_tools/graph_pt_steps.py` | Transverse momentum of each particle, per process. |
 | `analysis_tools/graph_mass_steps.py` | Single-particle mass and pair invariant masses, per process, including the diphoton mass. |
 | `collision_data/events.txt` | The current dataset: 100,000 events in the 3D seven-column format, with no cuts applied. |
-| `collision_data/events_small.txt` | The first 100 events of `events.txt`, written alongside it by `collision.py`. Small enough to open on GitHub. |
 | `collision_data/events_analysed.txt` | The subset that survived the cuts, written by `analysis.py` in the same format. Regenerate it rather than committing it — it is in `.gitignore`. |
-| `tests/` | 51 automated checks on the physics, the generator, the file reader and the cuts. Run them with `python -m unittest`. See [section 3.5](#35-running-the-tests). |
 | `docs/report.pdf` | The written project report. The code and this README cite its sections and equations. |
 | `requirements.txt` | The Python packages the analysis needs. Install with `pip install -r requirements.txt`. |
+| `COPYING` | The license, the GNU General Public License version 3. See [section 9](#9-license). |
+
+---
+
+## 9. License
+
+This project is released under the **GNU General Public License, version 3**.
+The full text is in [`COPYING`](COPYING).
+
+In short, you are free to use, study, share and modify the code. If you
+distribute a modified version, you must release it under the same license and
+make its source code available too.
 
 ---
 
