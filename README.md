@@ -6,12 +6,10 @@ invents a physically valid set of outgoing particles for each collision, filters
 them through a simplified detector, and saves the survivors to a text file that
 we then turn into histograms.
 
-This README starts from the physics fundam, then shows how each idea turns into
+This README starts from the physics fundamentals, then shows how each idea turns into
 code, and finally how to run the program.
 
-The simulation now works in **full 3D**. Earlier versions kept everything in a
-flat plane to make the maths easier, so wherever that move changed something
-important, this README says so.
+The simulation now works in **3D**. 
 
 ![Energy of each particle in p p to e+ e- p p. Four outline curves share one set
 of axes, with a ratio panel underneath.](plots/pp_to_eplus_eminus_p_p/energy.png)
@@ -28,8 +26,6 @@ two protons (5 and 6), which is a real asymmetry in how we generate events — s
 
 ## Table of contents
 
-- [Project map](#project-map) — how every file fits together, at a glance
-
 1. [The physics, from scratch](#1-the-physics-from-scratch)
 2. [How the code mirrors the physics](#2-how-the-code-mirrors-the-physics)
 3. [How to run it](#3-how-to-run-it) — including
@@ -40,75 +36,6 @@ two protons (5 and 6), which is a real asymmetry in how we generate events — s
 7. [Known limitations and things still to fix](#7-known-limitations-and-things-still-to-fix)
 8. [Project structure](#8-project-structure)
 9. [License](#9-license)
-
----
-
-## Project map
-
-Every folder in the project, the files inside it, and how they connect. Read it
-left to right: the collisions are generated, then cut, then plotted.
-
-```mermaid
-flowchart LR
-    subgraph ROOT["project root"]
-        direction TB
-        SIM["simulation.py<br/>Stage 1: generate"]
-        CARD[/"analysis_card.txt<br/>the cut values you edit"/]
-        ANA["analysis.py<br/>Stage 2: apply the cuts"]
-    end
-
-    subgraph UTIL["utilities/"]
-        KIN["kinematics.py<br/>physics engine:<br/>momenta, pT and η"]
-    end
-
-    subgraph CDATA["collision_data/"]
-        EV[("events.txt<br/>every collision, uncut")]
-    end
-
-    subgraph TOOLS["analysis_tools/"]
-        direction TB
-        ED["event_data.py<br/>reads event files"]
-        SP["step_plot.py<br/>draws the outlines"]
-        GR["graph_*_steps.py<br/>Stage 3: plot"]
-        subgraph ADATA["analysis_data/"]
-            EA[("events_analysed.txt<br/>only events that pass the cuts")]
-        end
-    end
-
-    subgraph PLOTS["plots/"]
-        PNG["73 figures<br/>one folder per process"]
-    end
-
-    KIN -->|momenta| SIM
-    SIM -->|writes| EV
-    EV -->|read by| ED
-    ED --> ANA
-    CARD -->|cut values| ANA
-    KIN -->|pT and η| ANA
-    ANA -->|writes| EA
-    KIN -->|pT and η| ED
-    ED --> GR
-    SP --> GR
-    EA -.->|optional| ED
-    GR -->|writes| PNG
-```
-
-| Shape | Means |
-|---|---|
-| Rectangle | A Python file |
-| Cylinder | A data file the code writes |
-| Slanted box | The settings file you edit |
-| Solid arrow | Always happens |
-| Dotted arrow | Only if you choose it: point the graph scripts at the cut events instead of the raw ones (see [section 3.2](#32-run-the-analysis-and-the-plots)) |
-
-The only files you ever run are `simulation.py` and `analysis.py` in the project
-root, and the four `graph_*_steps.py` scripts in `analysis_tools/`. Everything
-else is either code they use or a file they write. The full folder tree, with a line on every file, is in
-[section 8](#8-project-structure).
-
-> The map is drawn with Mermaid, which GitHub displays as a diagram
-> automatically. VS Code's built-in Markdown preview shows it as plain text
-> unless you install the *Markdown Preview Mermaid Support* extension.
 
 ---
 
