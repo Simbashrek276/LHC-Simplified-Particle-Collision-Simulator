@@ -6,9 +6,8 @@ invents a physically valid set of outgoing particles for each collision, filters
 them through a simplified detector, and saves the survivors to a text file that
 we then turn into histograms.
 
-This README is written for someone who has **never seen the code or the physics
-before**. It starts from the physics ideas, then shows how each idea turns into
-code, and finally how to run everything.
+This README starts from the physics fundam, then shows how each idea turns into
+code, and finally how to run the program.
 
 The simulation now works in **full 3D**. Earlier versions kept everything in a
 flat plane to make the maths easier, so wherever that move changed something
@@ -29,6 +28,8 @@ two protons (5 and 6), which is a real asymmetry in how we generate events — s
 
 ## Table of contents
 
+- [Project map](#project-map) — how every file fits together, at a glance
+
 1. [The physics, from scratch](#1-the-physics-from-scratch)
 2. [How the code mirrors the physics](#2-how-the-code-mirrors-the-physics)
 3. [How to run it](#3-how-to-run-it) — including
@@ -39,6 +40,75 @@ two protons (5 and 6), which is a real asymmetry in how we generate events — s
 7. [Known limitations and things still to fix](#7-known-limitations-and-things-still-to-fix)
 8. [Project structure](#8-project-structure)
 9. [License](#9-license)
+
+---
+
+## Project map
+
+Every folder in the project, the files inside it, and how they connect. Read it
+left to right: the collisions are generated, then cut, then plotted.
+
+```mermaid
+flowchart LR
+    subgraph ROOT["project root"]
+        direction TB
+        SIM["simulation.py<br/>Stage 1: generate"]
+        CARD[/"analysis_card.txt<br/>the cut values you edit"/]
+        ANA["analysis.py<br/>Stage 2: apply the cuts"]
+    end
+
+    subgraph UTIL["utilities/"]
+        KIN["kinematics.py<br/>physics engine:<br/>momenta, pT and η"]
+    end
+
+    subgraph CDATA["collision_data/"]
+        EV[("events.txt<br/>every collision, uncut")]
+    end
+
+    subgraph TOOLS["analysis_tools/"]
+        direction TB
+        ED["event_data.py<br/>reads event files"]
+        SP["step_plot.py<br/>draws the outlines"]
+        GR["graph_*_steps.py<br/>Stage 3: plot"]
+        subgraph ADATA["analysis_data/"]
+            EA[("events_analysed.txt<br/>only events that pass the cuts")]
+        end
+    end
+
+    subgraph PLOTS["plots/"]
+        PNG["73 figures<br/>one folder per process"]
+    end
+
+    KIN -->|momenta| SIM
+    SIM -->|writes| EV
+    EV -->|read by| ED
+    ED --> ANA
+    CARD -->|cut values| ANA
+    KIN -->|pT and η| ANA
+    ANA -->|writes| EA
+    KIN -->|pT and η| ED
+    ED --> GR
+    SP --> GR
+    EA -.->|optional| ED
+    GR -->|writes| PNG
+```
+
+| Shape | Means |
+|---|---|
+| Rectangle | A Python file |
+| Cylinder | A data file the code writes |
+| Slanted box | The settings file you edit |
+| Solid arrow | Always happens |
+| Dotted arrow | Only if you choose it: point the graph scripts at the cut events instead of the raw ones (see [section 3.2](#32-run-the-analysis-and-the-plots)) |
+
+The only files you ever run are `simulation.py` and `analysis.py` in the project
+root, and the four `graph_*_steps.py` scripts in `analysis_tools/`. Everything
+else is either code they use or a file they write. The full folder tree, with a line on every file, is in
+[section 8](#8-project-structure).
+
+> The map is drawn with Mermaid, which GitHub displays as a diagram
+> automatically. VS Code's built-in Markdown preview shows it as plain text
+> unless you install the *Markdown Preview Mermaid Support* extension.
 
 ---
 
@@ -408,7 +478,7 @@ any stage on its own.
         │                                 │                            │
         │ uses utilities/kinematics.py    │ reads analysis_card.txt     │ use event_data.py
         ▼                                 ▼                            ▼
-   collision_data/events.txt ───►  collision_data/events_analysed.txt ───►  plots/
+   collision_data/events.txt ───►  analysis_tools/analysis_data/events_analysed.txt ───►  plots/
         (everything, uncut)              (only what survives)         (73 figures)
 ```
 
@@ -428,8 +498,13 @@ rather than a detector limitation.
 
 **`kinematics.py`** is organised in five numbered sections, in reading order:
 
-1. **The four-vector.** `P4 = (E, px, py, pz)`, plus `mass(p4)` and
-   `invariant_mass(*p4s)` — a direct translation of sections 1.4 and 1.7.
+1. **The four-vector and what you can measure from it.** `P4 = (E, px, py, pz)`,
+   plus `mass(p4)` and `invariant_mass(*p4s)` — a direct translation of sections
+   1.4 and 1.7 — and `transverse_momentum(p4)` and `pseudorapidity(p4)`, the two
+   quantities the detector cuts are built on (section 1.9). These are the only
+   place in the project where pT and η are calculated: `analysis.py` uses them
+   for the cuts, and the graphing scripts use them for the plots, so everything
+   is guaranteed to agree.
 2. **The two building blocks.** `two_body_decay(parent_mass, m1, m2)` splits a
    parent-at-rest into two children; `boost(p4, parent_p4)` carries a child from
    its parent's rest frame into the lab; `decay_in_lab(...)` is a small helper
@@ -472,7 +547,7 @@ numbers, which keeps the physics reusable and testable on its own.
 
 ```
 Cuts applied:
-  |eta|        < 2.5   (theta in [9.385, 170.615] deg)
+  |eta|        < 2.5
   pt          >= 0.1 TeV
   event kept if: every particle must pass
 
@@ -485,7 +560,7 @@ channel         events      kept    kept %    particles kept %
 TOTAL           100000     92633     92.6%               97.3%
 ```
 
-It then writes the survivors to `collision_data/events_analysed.txt` in exactly
+It then writes the survivors to `analysis_tools/analysis_data/events_analysed.txt` in exactly
 the same format as `events.txt`, so the graphing scripts can read either one
 without modification.
 
@@ -615,7 +690,7 @@ python analysis.py                        # ~4s
 ```
 
 This reads `analysis_card.txt`, prints how many events survived each channel, and
-writes the survivors to `collision_data/events_analysed.txt`. Edit the card and
+writes the survivors to `analysis_tools/analysis_data/events_analysed.txt`. Edit the card and
 run it again to try a different set of cuts — you never have to regenerate the
 collisions.
 
@@ -644,7 +719,7 @@ instead, change one line at the top of each script:
 
 ```python
 DATA_FILE = PROJECT_ROOT / "collision_data" / "events.txt"           # before
-DATA_FILE = PROJECT_ROOT / "collision_data" / "events_analysed.txt"  # after
+DATA_FILE = PROJECT_ROOT / "analysis_tools" / "analysis_data" / "events_analysed.txt"  # after
 ```
 
 ### 3.3 Re-generate the collisions
@@ -698,9 +773,11 @@ pseudo_rapidity_max = 2.5        <-- CHANGE THIS   (|eta| limit; 'none' switches
 
 transverse_momentum_min = 0.1    <-- CHANGE THIS   (TeV; momentum across the beam)
 
-require_all_particles = yes      <-- yes = whole event fails if any particle fails
 write_filtered_file = yes        <-- yes = also save the surviving events
 ```
+
+An event is kept only if **every** particle in it passes every cut that is
+switched on. If even one particle fails, the whole event is dropped.
 
 | Setting | Units | Switch it off with | To loosen it | To tighten it |
 |---|---|---|---|---|
@@ -779,13 +856,14 @@ existed, so it is the one exception — see
 
 ## 4. The output file explained
 
-The project produces exactly **two event files**, both in `collision_data/` and
-both in the format described below:
+The project produces exactly **two event files**, both in the format described
+below. Each one lives in a folder named after the stage that writes it, so you can
+always tell the raw events from the cut ones:
 
 | File | Written by | Contents |
 |---|---|---|
-| `events.txt` | `simulation.py` | Every generated collision, with no cuts applied |
-| `events_analysed.txt` | `analysis.py` | Only the events that pass the cuts in `analysis_card.txt` |
+| `collision_data/events.txt` | `simulation.py` | Every generated collision, with no cuts applied |
+| `analysis_tools/analysis_data/events_analysed.txt` | `analysis.py` | Only the events that pass the cuts in `analysis_card.txt` |
 
 `collision_data/events.txt` holds one block per accepted event:
 
@@ -994,7 +1072,7 @@ These are honest caveats rather than bugs that break the run.
    the full sample. Running `analysis.py` with the card's default cuts would drop
    roughly 7% of events. Everything is consistent as it stands — just be aware
    the plots show the unfiltered picture unless you point the graph scripts at
-   `events_analysed.txt`.
+   `analysis_tools/analysis_data/events_analysed.txt`.
 
 7. **`collision_data/events.txt` is 48 MB and tracked in git.** Convenient, since the plots can
    be reproduced without re-running anything, but it makes the repository heavy.
@@ -1028,7 +1106,10 @@ LHC Simulation/
 ├── utilities/
 │   └── kinematics.py           the physics engine
 │
-├── analysis_tools/             STAGE 3 — the plotting code
+├── analysis_tools/             STAGE 3 — the plotting code, plus the cut events
+│   ├── analysis_data/
+│   │   └── events_analysed.txt only the events that survived the cuts
+│   │                           (written by analysis.py)
 │   ├── event_data.py           reads an events file into tidy arrays
 │   ├── step_plot.py            outline-histogram drawing (a library, not a script)
 │   ├── graph_energy_steps.py   ┐
@@ -1037,9 +1118,8 @@ LHC Simulation/
 │   └── graph_mass_steps.py     ┘
 │
 ├── collision_data/
-│   ├── events.txt              100,000 events, the full uncut dataset
-│   └── events_analysed.txt     only the events that survived the cuts
-│                               (written by analysis.py; not tracked in git)
+│   └── events.txt              100,000 events, the full uncut dataset
+│                               (written by simulation.py)
 │
 ├── plots/                      73 figures, one folder per process
 │   ├── pp_to_p_p/
@@ -1065,7 +1145,7 @@ working directory, so they behave the same wherever you launch them from.
 |------|------------|
 | `utilities/kinematics.py` | The physics engine: four-vectors, two-body decays, Lorentz boosts, invariant mass. Knows nothing about particle names. |
 | `simulation.py` | Stage 1. Chooses final states, generates their kinematics, writes `collision_data/events.txt`. Applies no cuts. |
-| `analysis.py` | Stage 2. Reads `analysis_card.txt`, applies the cuts, reports what survived, writes `collision_data/events_analysed.txt`. |
+| `analysis.py` | Stage 2. Reads `analysis_card.txt`, applies the cuts, reports what survived, writes `analysis_tools/analysis_data/events_analysed.txt`. |
 | `analysis_card.txt` | The cut values, in plain text. **The only file you edit to change what the detector sees.** |
 | `analysis_tools/event_data.py` | Parses `events.txt` and groups events by channel. Run it on its own for a quick summary of the dataset. |
 | `analysis_tools/step_plot.py` | Turns bin counts into outline curves and lays out the figure, including the ratio panel. Imported by the four scripts below, and does nothing if you run it directly. |
@@ -1074,7 +1154,7 @@ working directory, so they behave the same wherever you launch them from.
 | `analysis_tools/graph_pt_steps.py` | Transverse momentum of each particle, per process. |
 | `analysis_tools/graph_mass_steps.py` | Single-particle mass and pair invariant masses, per process, including the diphoton mass. |
 | `collision_data/events.txt` | The current dataset: 100,000 events in the 3D seven-column format, with no cuts applied. |
-| `collision_data/events_analysed.txt` | The subset that survived the cuts, written by `analysis.py` in the same format. Regenerate it rather than committing it — it is in `.gitignore`. |
+| `analysis_tools/analysis_data/events_analysed.txt` | The subset that survived the cuts, written by `analysis.py` in the same format as `events.txt`. Re-running `analysis.py` overwrites it. |
 | `docs/report.pdf` | The written project report. The code and this README cite its sections and equations. |
 | `requirements.txt` | The Python packages the analysis needs. Install with `pip install -r requirements.txt`. |
 | `COPYING` | The license, the GNU General Public License version 3. See [section 9](#9-license). |

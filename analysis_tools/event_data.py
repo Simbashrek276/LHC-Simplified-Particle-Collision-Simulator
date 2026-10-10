@@ -24,6 +24,7 @@ The graphing scripts work per process, because a figure titled "2 to 4" would be
 mixing muons, electrons, neutrons and photons on the same curve.
 """
 
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -35,6 +36,15 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "collision_data"
 DEFAULT_FILE = DATA_DIR / "events.txt"
+
+# The graphing scripts are launched from inside analysis_tools/, where Python
+# cannot see the utilities/ folder on its own. Adding the project root to the
+# search path lets us use the physics engine's pT and eta formulas directly,
+# rather than keeping a second copy of them here.
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from utilities import kinematics  # noqa: E402  (needs the path set up above)
 
 # Slot index 0 is "particle 3", because particles 1 and 2 are the incoming beam
 # protons and are not written to the file.
@@ -110,25 +120,31 @@ class Channel:
     def n_events(self):
         return self.energy.shape[0]
 
+    def _four_vectors(self):
+        """Every particle's four vector at once, as a P4 of whole arrays."""
+        return kinematics.P4(self.energy, self.px, self.py, self.pz)
+
     @property
     def pt(self):
-        """Transverse momentum, the part of the momentum across the beam (TeV).
+        """Transverse momentum of every particle (TeV), shape (n_events, n_particles).
 
-        pt = sqrt(px^2 + py^2) = |p| sin(theta).
+        Uses kinematics.transverse_momentum, which works on whole arrays in one go.
         """
-        return np.sqrt(self.px ** 2 + self.py ** 2)
+        return kinematics.transverse_momentum(self._four_vectors())
 
     @property
     def eta(self):
-        """Pseudorapidity, eta = -ln(tan(theta/2)).
+        """Pseudorapidity of every particle, shape (n_events, n_particles).
 
-        Computed as 0.5*ln((|p|+pz)/(|p|-pz)), which is the same number but does
-        not lose precision when theta is tiny. A particle exactly on the beam
-        line would have infinite eta; with 100,000 events that never happens.
+        Uses kinematics.pseudorapidity, applied to each particle in turn. That
+        function works on one number at a time (it needs math.log), so
+        np.vectorize runs it across the whole array for us.
         """
-        p = np.sqrt(self.px ** 2 + self.py ** 2 + self.pz ** 2)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            return 0.5 * np.log((p + self.pz) / (p - self.pz))
+        one_particle = np.vectorize(
+            lambda E, px, py, pz: kinematics.pseudorapidity(kinematics.P4(E, px, py, pz)),
+            otypes=[float],
+        )
+        return one_particle(self.energy, self.px, self.py, self.pz)
 
     def particle_number(self, slot):
         """File slot index to the particle number used in docs/report.pdf (3, 4, 5, 6)."""

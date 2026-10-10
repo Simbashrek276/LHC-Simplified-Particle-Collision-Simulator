@@ -14,15 +14,17 @@ Run:  python analysis.py
       python analysis.py my_other_card.txt      (to use a different card)
 """
 
-import math
 import sys
 from pathlib import Path
 
 from analysis_tools import event_data
+from utilities import kinematics
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_CARD = PROJECT_ROOT / "analysis_card.txt"
-FILTERED_FILE = PROJECT_ROOT / "collision_data" / "events_analysed.txt"
+# The cut events live with the analysis tools, separate from the raw events in
+# collision_data/, so the folder name says which stage produced which file.
+FILTERED_FILE = PROJECT_ROOT / "analysis_tools" / "analysis_data" / "events_analysed.txt"
 
 # Every setting the card understands, with the value used if the card leaves it
 # out. Anything not in here is rejected, so a typo becomes an error message
@@ -33,11 +35,10 @@ DEFAULTS = {
     "theta_max_deg": 180.0,
     "pseudo_rapidity_max": None,
     "transverse_momentum_min": 0.0,
-    "require_all_particles": True,
     "write_filtered_file": True,
 }
 
-BOOLEAN_SETTINGS = {"require_all_particles", "write_filtered_file"}
+BOOLEAN_SETTINGS = {"write_filtered_file"}
 
 
 # Section 1. Reading the card.
@@ -137,9 +138,7 @@ def describe(settings):
             f"{settings['theta_max_deg']}] deg"
         )
     if settings["pseudo_rapidity_max"] is not None:
-        eta = settings["pseudo_rapidity_max"]
-        lo = math.degrees(2 * math.atan(math.exp(-eta)))
-        lines.append(f"  |eta|        < {eta}   (theta in [{lo:.3f}, {180 - lo:.3f}] deg)")
+        lines.append(f"  |eta|        < {settings['pseudo_rapidity_max']}")
     if settings["transverse_momentum_min"] > 0:
         lines.append(f"  pt          >= {settings['transverse_momentum_min']} TeV")
     if not lines:
@@ -156,29 +155,27 @@ def particle_passes(energy, theta_deg, px, py, pz, settings):
     if not settings["theta_min_deg"] <= theta_deg <= settings["theta_max_deg"]:
         return False
 
+    # pT and eta come from the physics engine, so the cuts use exactly the same
+    # formulas as everything else in the project.
+    p4 = kinematics.P4(energy, px, py, pz)
+
     if settings["transverse_momentum_min"] > 0:
-        pt = math.sqrt(px * px + py * py)
-        if pt < settings["transverse_momentum_min"]:
+        if kinematics.transverse_momentum(p4) < settings["transverse_momentum_min"]:
             return False
 
     if settings["pseudo_rapidity_max"] is not None:
-        # eta = 0.5*ln((|p|+pz)/(|p|-pz)), which equals -ln(tan(theta/2)) but
-        # does not blow up when theta is tiny. A particle exactly on the beam
-        # line has infinite eta and correctly fails any finite cut.
-        p_mag = math.sqrt(px * px + py * py + pz * pz)
-        if p_mag <= 0 or abs(pz) >= p_mag:
-            return False
-        eta = 0.5 * math.log((p_mag + pz) / (p_mag - pz))
-        if abs(eta) >= settings["pseudo_rapidity_max"]:
+        if abs(kinematics.pseudorapidity(p4)) >= settings["pseudo_rapidity_max"]:
             return False
 
     return True
 
 
 def analyse(settings, data_file=None):
-    """Apply the cuts to every channel. Returns per-channel and overall counts."""
+    """Apply the cuts to every channel. Returns per-channel and overall counts.
+
+    An event is kept only if every one of its particles passes every cut.
+    """
     channels = event_data.load_events(data_file or event_data.DEFAULT_FILE)
-    strict = settings["require_all_particles"]
 
     results = {}
     for n, ch in channels.items():
@@ -194,7 +191,7 @@ def analyse(settings, data_file=None):
                 for j in range(n)
             ]
             particles_kept += sum(flags)
-            kept_mask.append(all(flags) if strict else any(flags))
+            kept_mask.append(all(flags))
 
         results[n] = {
             "channel": ch,
@@ -219,9 +216,7 @@ def report(settings, results, card_path):
     print("Cuts applied:")
     for line in describe(settings):
         print(line)
-    mode = "every particle must pass" if settings["require_all_particles"] \
-        else "at least one particle must pass"
-    print(f"  event kept if: {mode}")
+    print("  event kept if: every particle must pass")
     print()
 
     header = f"{'channel':<12}{'events':>10}{'kept':>10}{'kept %':>10}{'particles kept %':>20}"
@@ -292,7 +287,8 @@ def main():
         print(f"  {FILTERED_FILE}")
         print()
         print("To plot these instead of the full sample, change DATA_FILE at the")
-        print("top of the graph_*_steps.py scripts to point at events_analysed.txt.")
+        print("top of the graph_*_steps.py scripts to point at")
+        print("analysis_tools/analysis_data/events_analysed.txt.")
     else:
         print("write_filtered_file is off, so no file was written.")
 

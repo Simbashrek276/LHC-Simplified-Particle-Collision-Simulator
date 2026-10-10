@@ -8,6 +8,9 @@
 #  You never need to edit any Python file to change a cut. This card is the
 #  only input analysis.py takes.
 #
+#  An event is kept only if EVERY particle in it passes every cut that is
+#  switched on. If even one particle fails, the whole event is dropped.
+#
 #  Rules for this file:
 #    - one setting per line, written as   name = value
 #    - anything after a # is a comment and is ignored
@@ -74,21 +77,10 @@ transverse_momentum_min = 0.1
 
 
 # ---------------------------------------------------------------------------
-#  HOW TO TREAT AN EVENT WHOSE PARTICLES DISAGREE
-# ---------------------------------------------------------------------------
-#  yes  = keep the event only if EVERY particle in it passes every cut.
-#         This is the strict reading and the default.
-#  no   = keep the event if AT LEAST ONE particle passes.
-#         Useful if you only care that something was detected.
-
-require_all_particles = yes
-
-
-# ---------------------------------------------------------------------------
 #  OUTPUT
 # ---------------------------------------------------------------------------
 #  yes = also write the surviving events to
-#            collision_data/events_analysed.txt
+#            analysis_tools/analysis_data/events_analysed.txt
 #        in the same format as events.txt, so the graphing scripts can read it.
 #  no  = just print the report and write nothing.
 

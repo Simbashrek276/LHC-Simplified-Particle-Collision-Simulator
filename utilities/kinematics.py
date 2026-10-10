@@ -12,7 +12,8 @@ those into its pieces. Every split is a simple two body decay done in the
 parent's rest frame, then boosted into the lab.
 
 Read the file in this order.
-    1. P4 and its mass
+    1. P4 and what you can measure from it: mass, transverse momentum, and
+       pseudorapidity
     2. two_body_decay and boost, the two building blocks
     3. draw_composite_mass, picking a composite's mass
     4. two_to_two, two_to_three, two_to_four, putting the blocks together
@@ -64,6 +65,50 @@ def invariant_mass(*p4s):
     py = sum(p.py for p in p4s)
     pz = sum(p.pz for p in p4s)
     return mass(P4(E, px, py, pz))
+
+
+def transverse_momentum(p4):
+    """Transverse momentum: the part of the momentum that points across the beam.
+
+        pT = sqrt(px^2 + py^2) = |p| sin(theta)
+
+    The beam runs along z, so px and py are the sideways components. For a
+    massless particle |p| = E, so this is also E sin(theta). It is the quantity
+    a detector actually measures, and one of the cuts in analysis_card.txt.
+
+    Only use it on a four vector in the lab frame. pT changes under a boost, so
+    a daughter's pT in its parent's rest frame is not the pT the detector sees.
+
+    Written with ** 0.5 rather than math.sqrt so that it works on a single
+    number and on whole numpy arrays alike.
+    """
+    return (p4.px ** 2 + p4.py ** 2) ** 0.5
+
+
+def pseudorapidity(p4):
+    """Pseudorapidity, eta = -ln(tan(theta / 2)).
+
+    This is the polar angle theta written in the units LHC experiments use.
+    A particle going straight out the side (theta = 90 deg) has eta = 0, and eta
+    grows the closer the particle gets to the beam line. |eta| < 2.5 means
+    9.385 deg < theta < 170.615 deg, the usual ATLAS/CMS detector coverage.
+
+    We compute it as
+
+        eta = 0.5 * ln( (|p| + pz) / (|p| - pz) )
+
+    which is exactly the same number, but stays accurate when theta is tiny,
+    where tan(theta / 2) would lose precision. A particle exactly on the beam
+    line has infinite eta, which correctly fails any finite cut.
+
+    Like pT, only meaningful for a four vector in the lab frame.
+    """
+    p = math.sqrt(p4.px ** 2 + p4.py ** 2 + p4.pz ** 2)
+    if p == 0.0:
+        return 0.0
+    if abs(p4.pz) >= p:
+        return math.copysign(math.inf, p4.pz)
+    return 0.5 * math.log((p + p4.pz) / (p - p4.pz))
 
 
 # Section 2. The two building blocks, decay and boost
