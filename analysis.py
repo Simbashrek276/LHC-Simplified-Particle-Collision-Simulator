@@ -30,6 +30,7 @@ FILTERED_FILE = PROJECT_ROOT / "analysis_tools" / "analysis_data" / "events_anal
 # out. Anything not in here is rejected, so a typo becomes an error message
 # rather than a cut that silently does nothing.
 DEFAULTS = {
+    "final_state": None,          # None keeps every collision type
     "min_energy": 0.0,
     "theta_min_deg": 0.0,
     "theta_max_deg": 180.0,
@@ -90,6 +91,9 @@ def _parse_value(name, value, filename, line_no):
     """Turn one card value into a number, a bool, or None."""
     low = value.lower()
 
+    if name == "final_state":
+        return _parse_final_state(value, filename, line_no)
+
     if name in BOOLEAN_SETTINGS:
         if low in ("yes", "true", "on", "1"):
             return True
@@ -112,6 +116,40 @@ def _parse_value(name, value, filename, line_no):
         )
 
 
+def _parse_final_state(value, filename, line_no):
+    """Turn the card's final_state value into a tuple of collision-type IDs.
+
+    'all' (or 'none', or nothing) means keep every collision type, and comes back
+    as None. Otherwise it is one ID or several separated by commas, such as
+    '4' or '2, 6'. Each ID must be one of event_data.PROCESS_IDS.
+    """
+    if value.strip().lower() in ("all", "none", ""):
+        return None
+
+    valid = ", ".join(
+        f"{pid} = {event_data.process_ascii(state)}"
+        for pid, state in event_data.PROCESS_IDS.items()
+    )
+    ids = []
+    for part in value.split(","):
+        part = part.strip()
+        try:
+            pid = int(part)
+        except ValueError:
+            raise SystemExit(
+                f"{filename} line {line_no}: final_state should be 'all' or collision-type "
+                f"IDs separated by commas, got {value!r}.\nValid IDs: {valid}"
+            )
+        if pid not in event_data.PROCESS_IDS:
+            raise SystemExit(
+                f"{filename} line {line_no}: there is no collision type with ID {pid}.\n"
+                f"Valid IDs: {valid}"
+            )
+        if pid not in ids:
+            ids.append(pid)
+    return tuple(sorted(ids))
+
+
 def _validate(s):
     """Catch settings that are individually fine but cannot work together."""
     if s["theta_min_deg"] >= s["theta_max_deg"]:
@@ -130,6 +168,9 @@ def _validate(s):
 def describe(settings):
     """A human readable summary of which cuts are actually switched on."""
     lines = []
+    for pid in settings["final_state"] or ():
+        state = event_data.PROCESS_IDS[pid]
+        lines.append(f"  final state  = {pid}  ({event_data.process_ascii(state)})")
     if settings["min_energy"] > 0:
         lines.append(f"  energy      >= {settings['min_energy']} TeV")
     if settings["theta_min_deg"] > 0 or settings["theta_max_deg"] < 180:
@@ -142,7 +183,7 @@ def describe(settings):
     if settings["transverse_momentum_min"] > 0:
         lines.append(f"  pt          >= {settings['transverse_momentum_min']} TeV")
     if not lines:
-        lines.append("  (none -- every particle passes)")
+        lines.append("  (none -- every event passes)")
     return lines
 
 
@@ -173,15 +214,26 @@ def particle_passes(energy, theta_deg, px, py, pz, settings):
 def analyse(settings, data_file=None):
     """Apply the cuts to every channel. Returns per-channel and overall counts.
 
-    An event is kept only if every one of its particles passes every cut.
+    An event is kept only if it is one of the collision types chosen with
+    final_state, AND every one of its particles passes every cut.
     """
     channels = event_data.load_events(data_file or event_data.DEFAULT_FILE)
+
+    # The final states the card asked for, or None to keep every type.
+    chosen = None
+    if settings["final_state"] is not None:
+        chosen = {event_data.PROCESS_IDS[pid] for pid in settings["final_state"]}
 
     results = {}
     for n, ch in channels.items():
         kept_mask = []
         particles_kept = 0
         for i in range(ch.n_events):
+            # Wrong collision type: drop the whole event without looking further.
+            if chosen is not None and ch.states[i] not in chosen:
+                kept_mask.append(False)
+                continue
+
             flags = [
                 particle_passes(
                     ch.energy[i, j], ch.theta[i, j],
@@ -240,6 +292,23 @@ def report(settings, results, card_path):
     ppct = 100.0 * tot_pk / tot_p if tot_p else 0.0
     print(f"{'TOTAL':<12}{tot:>10}{tot_kept:>10}{pct:>9.1f}%{ppct:>19.1f}%")
     print()
+
+    # With a final state chosen, the table above counts every event in the file,
+    # so its percentages look small. This shows how the chosen types fared.
+    if settings["final_state"] is not None:
+        print("Chosen collision types:")
+        for pid in settings["final_state"]:
+            state = event_data.PROCESS_IDS[pid]
+            in_file = kept = 0
+            for r in results.values():
+                for s, k in zip(r["channel"].states, r["mask"]):
+                    if s == state:
+                        in_file += 1
+                        kept += k
+            share = f"{100.0 * kept / in_file:.1f}%" if in_file else "-"
+            print(f"  {pid}  {event_data.process_ascii(state):<26}"
+                  f"{in_file:>7} in the file, {kept:>7} pass the cuts ({share})")
+        print()
     return tot, tot_kept
 
 
@@ -294,7 +363,8 @@ def main():
 
     if kept == 0:
         print()
-        print("WARNING: no events survived. The cuts in the card are too tight.")
+        print("WARNING: no events survived. Either the chosen final_state does not")
+        print("occur in this dataset, or the cuts in the card are too tight.")
 
 
 if __name__ == "__main__":

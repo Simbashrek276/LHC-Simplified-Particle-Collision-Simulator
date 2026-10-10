@@ -1,14 +1,16 @@
 # ===========================================================================
 #  ANALYSIS CARD
 # ===========================================================================
-#  Edit the numbers in this file to change the detector cuts, then run
+#  Edit the settings in this file to choose which collisions to keep and
+#  which detector cuts to apply, then run
 #
 #      python analysis.py
 #
 #  You never need to edit any Python file to change a cut. This card is the
 #  only input analysis.py takes.
 #
-#  An event is kept only if EVERY particle in it passes every cut that is
+#  An event is kept only if it is one of the collision types chosen under
+#  FINAL STATE below, AND every particle in it passes every cut that is
 #  switched on. If even one particle fails, the whole event is dropped.
 #
 #  Rules for this file:
@@ -18,6 +20,30 @@
 #    - write  none  to switch a cut off entirely
 #    - order does not matter
 # ===========================================================================
+
+
+# ---------------------------------------------------------------------------
+#  FINAL STATE (COLLISION TYPE)
+# ---------------------------------------------------------------------------
+#  Choose which collision types to keep, by their ID:
+#
+#      ID   collision type
+#      --   --------------------------
+#       1   p p  ->  p p
+#       2   p p  ->  gamma p p
+#       3   p p  ->  n nbar p p
+#       4   p p  ->  e+ e- p p
+#       5   p p  ->  mu- mu+ p p
+#       6   p p  ->  gamma gamma p p
+#
+#  Write  all  to keep every collision type.
+#  Write one ID to keep only that type, e.g.   final_state = 4
+#  Write several IDs separated by commas to keep more than one type, e.g.
+#  final_state = 2, 6   keeps the two processes that contain photons.
+#
+#  The cuts below still apply on top of this choice.
+
+final_state = all
 
 
 # ---------------------------------------------------------------------------

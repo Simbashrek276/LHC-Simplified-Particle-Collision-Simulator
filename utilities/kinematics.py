@@ -1,5 +1,5 @@
 """Relativistic kinematics toolkit. Based on section 2.5 of the project report,
-docs/report.pdf.
+Report_and_Manual/report.pdf.
 
 This is the physics engine. It knows nothing about photons or protons by name.
 It only works with numbers, the masses in TeV and the four vectors. simulation.py
@@ -165,7 +165,7 @@ def boost(p4, parent_p4):
         (2) vector p4 (E, px, py, pz): the energy momentum of the child particle
         in the rest frame of the parent particle (will be boost's argument)
     Output: vector new_P4(E, px, py, pz): the four vector of the child particle
-    in the lab frame (the 3D generalization of equation 8 in docs/report.pdf)
+    in the lab frame (the 3D generalization of equation 8 in Report_and_Manual/report.pdf)
     """
     E_A = parent_p4.E
     if E_A <= 0:
@@ -242,7 +242,7 @@ def draw_composite_mass(low, high):
 
 
 # Section 4. The generators, one per number of particles that come out.
-# These are the 2 to 2, 2 to 3, and 2 to 4 cases from the report (docs/report.pdf).
+# These are the 2 to 2, 2 to 3, and 2 to 4 cases from the report (Report_and_Manual/report.pdf).
 
 def two_to_two(total_energy):
     """The collision turns into just two particles. This is the 2 to 2 case.

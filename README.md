@@ -24,6 +24,29 @@ two protons (5 and 6), which is a real asymmetry in how we generate events — s
 
 ---
 
+## Requirements
+
+| Package | Version | Needed by |
+|---|---|---|
+| **Python** | 3.8 or newer (developed on 3.14) | everything |
+| **numpy** | 1.24 or newer | `analysis.py` and the graphing scripts |
+| **matplotlib** | 3.7 or newer | the graphing scripts |
+
+`simulation.py` and `utilities/kinematics.py` use only the Python standard
+library, so you can generate collisions with nothing installed at all. Install
+the two packages with:
+
+```
+pip install "numpy>=1.24" "matplotlib>=3.7"
+```
+
+The project was developed and tested with numpy 2.4.1 and matplotlib 3.10.8, but
+it only uses basic features of each, so any version from the minimums above
+upwards should work. [Section 3.1](#31-what-you-need) shows how to set this up
+inside a virtual environment.
+
+---
+
 ## Table of contents
 
 1. [The physics, from scratch](#1-the-physics-from-scratch)
@@ -66,14 +89,17 @@ and governed by probabilities.
 The list of particles produced by one collision is called the **final state**.
 We use a fixed menu of possible final states, each with a fixed probability:
 
-| Probability | Final state                             | Particles |
-|-------------|-----------------------------------------|-----------|
-| 25%         | proton + proton                         | 2 |
-| 22%         | photon + proton + proton                | 3 |
-| 18%         | neutron + antineutron + proton + proton | 4 |
-| 15%         | positron + electron + proton + proton   | 4 |
-| 15%         | muon + antimuon + proton + proton       | 4 |
-| 5%          | photon + photon + proton + proton       | 4 |
+| ID | Probability | Final state                             | Particles |
+|----|-------------|-----------------------------------------|-----------|
+| 1  | 25%         | proton + proton                         | 2 |
+| 2  | 22%         | photon + proton + proton                | 3 |
+| 3  | 18%         | neutron + antineutron + proton + proton | 4 |
+| 4  | 15%         | positron + electron + proton + proton   | 4 |
+| 5  | 15%         | muon + antimuon + proton + proton       | 4 |
+| 6  | 5%          | photon + photon + proton + proton       | 4 |
+
+Each final state has a fixed **ID**. You use it in `analysis_card.txt` to choose
+which collision types to keep — see [section 3.4](#34-where-to-change-the-settings).
 
 Most cases also produce "proton remnants", the leftovers of the original protons
 that did not interact, alongside the interesting particles from the hard
@@ -243,7 +269,7 @@ search.*
 
 ### 1.8 How we build one event: split two at a time
 
-Here is the idea ([report](docs/report.pdf) section 2.5.3) that lets us create any final state while
+Here is the idea ([report](Report_and_Manual/report.pdf) section 2.5.3) that lets us create any final state while
 **guaranteeing** energy and momentum conservation.
 
 Rather than trying to place 3 or 4 particles at once, we only ever split **one
@@ -265,7 +291,7 @@ To build a 4-particle final state, say two photons and two protons:
 There is one complication. When we split `(34)` we work in the frame where `(34)`
 is standing still, but `(34)` is really **flying through the lab**. So we have to
 **boost** its two children, a Lorentz transformation that accounts for that
-motion. This is standard special relativity ([report](docs/report.pdf) section 2.5.4).
+motion. This is standard special relativity ([report](Report_and_Manual/report.pdf) section 2.5.4).
 
 > **3D again.** The boost used to be a 3×3 matrix acting on `(E, px, pz)`. It is
 > now the general 4×4 Lorentz boost acting on `(E, px, py, pz)`. Same idea, one
@@ -439,7 +465,7 @@ rather than a detector limitation.
    repeat themselves.
 3. **`draw_composite_mass(low, high)`** randomly picks the invariant mass of a
    made-up composite like `(34)`.
-4. **The generators**, one per final-state size, named after the [report](docs/report.pdf)'s cases:
+4. **The generators**, one per final-state size, named after the [report](Report_and_Manual/report.pdf)'s cases:
    `two_to_two`, `two_to_three`, `two_to_four`. Each is just the building blocks
    arranged as described in section 1.8. Every *final* particle is treated as
    **massless**; only the intermediate composites carry mass.
@@ -559,23 +585,20 @@ would have seen the result -- that is `analysis.py`.
 
 ### 3.1 What you need
 
-- **Python 3** (developed on 3.14).
-- **numpy** and **matplotlib**, for the analysis scripts only. The simulation
-  itself uses nothing outside the standard library.
+The packages and versions are listed under
+[Requirements](#requirements) at the top of this README.
 
 The virtual environment is **not** part of the repository (`.venv/` is in
-`.gitignore`), so after cloning, create your own and install the packages listed
-in `requirements.txt` into it:
+`.gitignore`), so after cloning, create your own and install the packages into
+it:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1          # Windows PowerShell
-pip install -r requirements.txt
+pip install "numpy>=1.24" "matplotlib>=3.7"
 ```
 
-On macOS or Linux the activate line is `source .venv/bin/activate` instead. The
-project was developed against numpy 2.4 and matplotlib 3.10, but any recent
-version of either should work.
+On macOS or Linux the activate line is `source .venv/bin/activate` instead.
 
 > Some Python builds on Windows (MSYS2, for example) create the environment with
 > a `bin/` folder instead of `Scripts/`. If `Scripts\Activate.ps1` does not
@@ -675,6 +698,7 @@ the code:
 
 | What you want to change | Where |
 |---|---|
+| **Which collision types to keep** | `analysis_card.txt`, setting `final_state` |
 | **The detector cuts** | `analysis_card.txt` — a plain text file, no Python |
 | **How many collisions to generate** | `simulation.py`, line 36 |
 
@@ -682,7 +706,7 @@ You never need to touch anything in `utilities/` or `analysis_tools/`.
 
 ---
 
-#### Changing the cuts — edit `analysis_card.txt`
+#### Choosing collision types and changing the cuts — edit `analysis_card.txt`
 
 Open `analysis_card.txt` in the project root. It is plain text with one setting
 per line and a block of explanation above each one. **Change the number to the
@@ -690,6 +714,8 @@ right of the `=` sign**, save, and re-run `python analysis.py`.
 
 ```
 # analysis_card.txt
+
+final_state = all                <-- CHANGE THIS   (collision type IDs, e.g. 4 or 2, 6)
 
 min_energy = 0.0                 <-- CHANGE THIS   (TeV; drop softer particles)
 
@@ -703,8 +729,36 @@ transverse_momentum_min = 0.1    <-- CHANGE THIS   (TeV; momentum across the bea
 write_filtered_file = yes        <-- yes = also save the surviving events
 ```
 
-An event is kept only if **every** particle in it passes every cut that is
-switched on. If even one particle fails, the whole event is dropped.
+An event is kept only if it is one of the chosen collision types **and every**
+particle in it passes every cut that is switched on. If even one particle fails,
+the whole event is dropped.
+
+**Choosing a collision type.** `final_state` takes the IDs from the table in
+[section 1.2](#12-what-comes-out-of-a-collision-the-final-state):
+
+| ID | Collision type |
+|---|---|
+| 1 | p p → p p |
+| 2 | p p → γ p p |
+| 3 | p p → n n̄ p p |
+| 4 | p p → e⁺ e⁻ p p |
+| 5 | p p → μ⁻ μ⁺ p p |
+| 6 | p p → γ γ p p |
+
+Write `final_state = all` to keep every type, a single ID such as
+`final_state = 4` to keep only that one, or several separated by commas, such as
+`final_state = 2, 6` for both processes that contain photons. When you choose a
+type, `analysis.py` adds a line to its report showing how many events of that
+type were in the file and how many passed the cuts:
+
+```
+Chosen collision types:
+  4  p p -> e+ e- p p            14843 in the file,   13202 pass the cuts (88.9%)
+```
+
+An ID that does not exist stops the program with the list of valid ones.
+
+**The cuts.**
 
 | Setting | Units | Switch it off with | To loosen it | To tighten it |
 |---|---|---|---|---|
@@ -1056,11 +1110,11 @@ LHC Simulation/
 │   ├── pp_to_eplus_eminus_p_p/
 │   └── pp_to_gamma_gamma_p_p/
 │
-├── docs/
-│   └── report.pdf              the written report with the full derivations
+├── Report_and_Manual/
+│   └── report.pdf              the report, which is also the manual
 │
-├── requirements.txt            the Python packages to install
-└── COPYING                     the license (GNU GPL v3)
+├── COPYING                     the license (GNU GPL v3)
+└── AUTHORS.md                  the people behind the project
 ```
 
 Every script works out these paths from its own location rather than from the
@@ -1082,9 +1136,9 @@ working directory, so they behave the same wherever you launch them from.
 | `analysis_tools/graph_mass_steps.py` | Single-particle mass and pair invariant masses, per process, including the diphoton mass. |
 | `collision_data/events.txt` | The current dataset: 100,000 events in the 3D seven-column format, with no cuts applied. |
 | `analysis_tools/analysis_data/events_analysed.txt` | The subset that survived the cuts, written by `analysis.py` in the same format as `events.txt`. Re-running `analysis.py` overwrites it. |
-| `docs/report.pdf` | The written project report. The code and this README cite its sections and equations. |
-| `requirements.txt` | The Python packages the analysis needs. Install with `pip install -r requirements.txt`. |
+| `Report_and_Manual/report.pdf` | The written project report, which is also the manual. The code and this README cite its sections and equations. |
 | `COPYING` | The license, the GNU General Public License version 3. See [section 9](#9-license). |
+| `AUTHORS.md` | The project's authors and supervisor. |
 
 ---
 
@@ -1098,6 +1152,8 @@ distribute a modified version, you must release it under the same license and
 make its source code available too.
 
 ---
+
+The people behind this project are listed in [`AUTHORS.md`](AUTHORS.md).
 
 *Phenikaa University Research Lab — computational physics simulation of
 high-energy proton collisions.*

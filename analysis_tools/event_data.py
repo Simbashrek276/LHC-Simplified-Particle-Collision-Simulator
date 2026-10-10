@@ -97,6 +97,28 @@ def process_slug(state):
     return "pp_to_" + "_".join(particle_ascii(n) for n in state)
 
 
+# A fixed ID for every collision type simulation.py can produce. analysis_card.txt
+# uses these IDs to choose which collision types to keep. The names in each tuple
+# are exactly the ones simulation.choose_final_state returns, in the same order.
+# If a final state is ever added to simulation.py, give it the next ID here.
+PROCESS_IDS = {
+    1: ("proton", "proton"),
+    2: ("photon", "proton", "proton"),
+    3: ("neutron", "antineutron", "proton", "proton"),
+    4: ("positron", "electron", "proton", "proton"),
+    5: ("muon", "antimuon", "proton", "proton"),
+    6: ("photon", "photon", "proton", "proton"),
+}
+
+
+def process_id(state):
+    """The ID of a final state, or None if it is not in PROCESS_IDS."""
+    for pid, s in PROCESS_IDS.items():
+        if s == tuple(state):
+            return pid
+    return None
+
+
 class Channel:
     """Every logged event that produced the same number of particles.
 
@@ -147,7 +169,7 @@ class Channel:
         return one_particle(self.energy, self.px, self.py, self.pz)
 
     def particle_number(self, slot):
-        """File slot index to the particle number used in docs/report.pdf (3, 4, 5, 6)."""
+        """File slot index to the particle number used in Report_and_Manual/report.pdf (3, 4, 5, 6)."""
         return slot + FIRST_PARTICLE_NUMBER
 
     def names_in_slot(self, slot):
@@ -288,7 +310,7 @@ def load_events(filename=DEFAULT_FILE):
     return {n: Channel(n, rows[n], states[n]) for n in sorted(rows)}
 
 
-# The name docs/report.pdf uses for each channel, for titles.
+# The name Report_and_Manual/report.pdf uses for each channel, for titles.
 CHANNEL_NAMES = {2: "2 to 2", 3: "2 to 3", 4: "2 to 4"}
 
 

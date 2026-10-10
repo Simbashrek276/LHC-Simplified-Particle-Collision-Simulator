@@ -1,9 +1,11 @@
-# docs/
+# Report_and_Manual/
 
-This folder holds the written project report, **`report.pdf`**, which contains
-the full physics derivations behind the simulation.
+This folder holds the project's written report, **`report.pdf`**. It serves as
+both the report and the manual: it contains the full physics derivations behind
+the simulation, and explains how the program works.
 
 The code and the main README refer to it by section and equation number — for
 example `utilities/kinematics.py` is built on section 2.5, and its Lorentz boost
-is the 3D generalisation of equation 8. If a link to `docs/report.pdf` is broken,
-the report has not been added to this copy of the repository yet.
+is the 3D generalisation of equation 8. If a link to
+`Report_and_Manual/report.pdf` is broken, the report has not been added to this
+copy of the repository yet.
