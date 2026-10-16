@@ -6,10 +6,9 @@ invents a physically valid set of outgoing particles for each collision, filters
 them through a simplified detector, and saves the survivors to a text file that
 we then turn into histograms.
 
-This README starts from the physics fundamentals, then shows how each idea turns into
-code, and finally how to run the program.
-
-The simulation now works in **3D**. 
+This README starts with how to install and run the program, then explains the
+physics fundamentals behind it, and finally shows how each idea turns into code.
+The simulation now works in **3D**.
 
 ![Energy of each particle in p p to e+ e- p p. Four outline curves share one set
 of axes, with a ratio panel underneath.](plots/pp_to_eplus_eminus_p_p/energy.png)
@@ -47,6 +46,110 @@ inside a virtual environment.
 
 ---
 
+## Quick start
+
+Run everything from the **project folder**, the one that contains
+`simulation.py`. In VS Code, *Terminal → New Terminal* opens a terminal there
+already. You can also open any of the scripts below and press the **▶ Run**
+button instead: every script finds its files from its own location, so it works
+either way.
+
+The program runs in three steps, and each step reads the file the one before it
+wrote.
+
+### Step 1 — Generate the collisions
+
+```
+python simulation.py
+```
+
+This writes every collision to `collision_data/events.txt`. A 100,000-event file
+is already included, so **you can skip this step** the first time.
+
+To change how many collisions are generated, edit line 36 of `simulation.py`:
+
+```python
+TARGET_LOGGED_EVENTS = 100000
+```
+
+> Running `simulation.py` **overwrites** `events.txt` without asking.
+
+### Step 2 — Choose collision types and set the cuts
+
+Open **`analysis_card.txt`** in the project folder and change the values after
+the `=` signs. This is the only file you need to edit; no Python is involved.
+
+| Setting | Line | What it does |
+|---|---|---|
+| `final_state` | 46 | Which collision types to keep, by ID: `all`, one ID such as `4`, or several such as `2, 6` |
+| `min_energy` | 56 | Drop particles carrying less energy than this (TeV) |
+| `theta_min_deg`, `theta_max_deg` | 70–71 | Keep only particles inside this angle window (degrees) |
+| `pseudo_rapidity_max` | 88 | Keep only particles with \|η\| below this |
+| `transverse_momentum_min` | 102 | Drop particles with transverse momentum below this (TeV) |
+
+The collision-type IDs are listed in the card itself, and every setting is
+explained in [section 3.4](#34-where-to-change-the-settings). Then run:
+
+```
+python analysis.py
+```
+
+It prints how many events survived, and writes them to
+`analysis_tools/analysis_data/events_analysed.txt`.
+
+### Step 3 — Draw the graphs and look at them
+
+```
+python analysis_tools/graph_energy_steps.py
+python analysis_tools/graph_angle_steps.py
+python analysis_tools/graph_pt_steps.py
+python analysis_tools/graph_mass_steps.py
+```
+
+Each one can be run on its own. The figures land in **`plots/`**, in one folder
+per collision type:
+
+```
+plots/
+├── pp_to_p_p/                  energy.png, theta.png, phi.png, eta.png, pt.png, ...
+├── pp_to_gamma_p_p/
+├── pp_to_n_nbar_p_p/
+├── pp_to_eplus_eminus_p_p/
+├── pp_to_muminus_muplus_p_p/
+└── pp_to_gamma_gamma_p_p/
+```
+
+**To look at them**, open `plots/` in the VS Code Explorer sidebar and click any
+`.png` file; it opens in a tab. You can also open the folder in your file
+manager, or browse into `plots/` on GitHub and click a file. What each graph
+should look like is described in
+[section 6](#6-what-the-plots-should-look-like).
+
+By default the graphs show **every** generated event, from `events.txt`. To
+graph only the events that passed your cuts in step 2, change the `DATA_FILE`
+line near the top of each graph script to:
+
+```python
+DATA_FILE = PROJECT_ROOT / "analysis_tools" / "analysis_data" / "events_analysed.txt"
+```
+
+That line is line 20 of `graph_energy_steps.py`, 49 of `graph_angle_steps.py`,
+37 of `graph_pt_steps.py`, and 51 of `graph_mass_steps.py`.
+
+### At a glance
+
+| I want to… | Edit | Then run |
+|---|---|---|
+| Generate more or fewer collisions | `simulation.py`, line 36 | `simulation.py`, then steps 2 and 3 |
+| Keep only some collision types | `analysis_card.txt`, `final_state` | `analysis.py` |
+| Change the cuts | `analysis_card.txt` | `analysis.py` |
+| Graph the cut events instead of all events | `DATA_FILE` near the top of each graph script | the graph scripts |
+
+That is the whole loop. The rest of this README explains the physics behind it
+and how the code works.
+
+---
+
 ## Table of contents
 
 1. [The physics, from scratch](#1-the-physics-from-scratch)
@@ -64,20 +167,17 @@ inside a virtual environment.
 
 ## 1. The physics, from scratch
 
-Read this section first. If you understand it, the code in section 2 will feel
-like a straight translation of these ideas.
-
 ### 1.1 What is actually being simulated?
 
 The LHC is a 27 km ring that accelerates two beams of **protons** in opposite
 directions and smashes them head-on. Each beam carries **6.8 TeV** of energy, so
-a head-on collision has a total energy of **13.6 TeV** — the real LHC "Run 3"
+a head-on collision has a total energy of **13.6 TeV**. THis is the real LHC "Run 3"
 energy.
 
 - **TeV** means tera-electronvolt, a unit of energy. Everything in this project
   is measured in TeV.
 - A **proton** is not fundamental. It is a bag of smaller pieces (quarks and
-  gluons, collectively "partons"). When two protons collide it is really one
+  gluons, collectively "partons"). When two protons collide, it is one
   piece from each proton that interacts hard, while the leftovers carry on.
 
 When the collision happens the energy is briefly concentrated into a tiny point
