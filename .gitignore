@@ -6,6 +6,12 @@ __pycache__/
 .venv/
 venv/
 
+# The 1,000,000-event dataset used for section 7 of the report, and its cut
+# version. Far too large for GitHub (about 500 MB); regenerate it with
+# simulation.py, SEED = 2026, TARGET_LOGGED_EVENTS = 1000000.
+collision_data/events_1M.txt
+analysis_tools/analysis_data/events_analysed_1M.txt
+
 # OS and editor cruft
 .DS_Store
 Thumbs.db

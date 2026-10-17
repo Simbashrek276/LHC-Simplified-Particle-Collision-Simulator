@@ -11,5 +11,8 @@ is the 3D generalisation of equation 8. If a link to
 copy of the repository yet.
 
 The `figures/` subfolder holds the images used in the report's "Example of
-Numerical Results" section, drawn from the current `collision_data/events.txt`
-with the project's own graph scripts.
+Numerical Results" section. They are drawn with the project's own graph scripts
+from a separate run of 1,000,000 events (seed 2026), using only the events that
+pass all of the default cuts. That run is too large to keep on GitHub; to
+regenerate it, set `TARGET_LOGGED_EVENTS = 1000000` in `simulation.py` and point
+`OUTPUT_FILE` at `collision_data/events_1M.txt` (already in `.gitignore`).
