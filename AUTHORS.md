@@ -2,13 +2,13 @@
 
 The LHC Simplified Particle Collision Simulator authors are:
 
-- **Hoang H. Le**, 12th, The Dewey Schools Tay Ho: Adventure International Program, Hanoi 11900, Vietnam.
-- **Minh B. Nguyen**, 12th, The Dewey Schools Tay Ho: Adventure International Program, Hanoi 11900, Vietnam.
-- **Ha B. Dao**, 12th, The Dewey Schools Tay Ho: Adventure International Program, Hanoi 11900, Vietnam.
+- **Huy Hoang Le**, 12th, The Dewey Schools Tay Ho: Adventure International Program, Hanoi 11900, Vietnam.
+- **Bao Minh Nguyen**, 12th, The Dewey Schools Tay Ho: Adventure International Program, Hanoi 11900, Vietnam.
+- **Bao Ha Dao**, 12th, The Dewey Schools Tay Ho: Adventure International Program, Hanoi 11900, Vietnam.
 
 ## Supervisor
 
-- **Ninh D. Le** Phenikaa Institute for Advanced Study, Phenikaa University, Hanoi 12116, Vietnam.
+- **Duc Ninh Le** Phenikaa Institute for Advanced Study, Phenikaa University, Hanoi 12116, Vietnam.
 
 ---
 
